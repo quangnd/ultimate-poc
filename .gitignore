@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+playwright-report/
+test-results/
+.local/
+secrets/
+*.log

@@ -1,0 +1,22 @@
+# Experiment Run: EXP-XX / RUN-YYYYMMDD-NN
+
+- Date/time/time zone:
+- Operator / environment:
+- Ultimate version + commit:
+- Pi / Pi Durable version:
+- Model/provider/configuration:
+- Task issue/branch/commit:
+- Hypothesis:
+- Controlled start state:
+- Procedure:
+- Expected:
+- Actual:
+- Outcome: PASS / PARTIAL / FAIL / NOT AVAILABLE
+- Elapsed minutes:
+- Human corrections / approvals (separately):
+- Token/cost data or unavailable:
+- Independent checks + reviewer:
+- Evidence path(s):
+- Observed failure and cause:
+- Confounders/limitations:
+- Follow-up issue:
