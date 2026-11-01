@@ -166,6 +166,9 @@ behaviour that tasks cannot express.
 Readings of the text above that P1 found open. They add no new behaviour; the Product Owner reviews them at the P1
 gate. Each is added in the PR that implements it.
 
+1. **`slipDays` counting (§6):** when the forecast finish is after the target, slip is +(working days in (target,
+   finish]). When it is before, slip is −(working days in (finish, target]). Equal dates give 0. A weekend target date
+   counts as the Friday before it. A `done` task's forecast finish is day −1, the working day before day 0. (#7)
 3. **Fields §9 does not name** (`title`, `ownerRole`, `workstreams`): structural checks only. They must be a string
    or an array of strings; empty values are allowed. (#6)
 4. **Cycle report:** the cycle is the depth-first-search stack slice from the revisited task to the current one, in
