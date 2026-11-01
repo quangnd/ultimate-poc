@@ -31,6 +31,14 @@ This is a **framework evaluation**, not a business-product launch. Success requi
 
 Open the repo in Ultimate and paste the prompt in [docs/START_HERE.md](docs/START_HERE.md). Start at Phase P0. Do not jump directly into app development.
 
+## Development
+
+```bash
+npm ci             # install exact dependencies from package-lock.json
+npm run typecheck  # tsc --noEmit
+npm test           # vitest run
+```
+
 ## Boundaries
 
 No confidential company data, secrets, service credentials or destructive tests. No automatic modification of Pi/Ultimate extensions without review and explicit human approval.
