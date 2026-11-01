@@ -1,19 +1,34 @@
 /**
  * Working-day calendar (ADR-002 §1, §3, §6): Monday-Friday, no holidays, UTC calendar dates only.
- * Dates go in and out as `YYYY-MM-DD` strings; the Date objects used for the arithmetic never leave this module.
+ * Dates go in and out as `YYYY-MM-DD` strings. The arithmetic is integer civil-date math (proleptic Gregorian), so no
+ * `Date` quirks apply: `Date.UTC` would map years 0000-0099, which the validator accepts, to 1900-1999.
  */
 import type { IsoDate } from './types'
 
-const MS_PER_DAY = 86_400_000
-
-/** Days since 1970-01-01 (a Thursday) of an ISO date. */
+/** Days since 1970-01-01 (a Thursday) of an ISO date (H. Hinnant's days_from_civil). */
 function toEpochDay(date: IsoDate): number {
-  const [year, month, day] = date.split('-').map(Number)
-  return Date.UTC(year!, month! - 1, day!) / MS_PER_DAY
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number]
+  const y = month <= 2 ? year - 1 : year
+  const era = Math.floor(y / 400)
+  const yoe = y - era * 400
+  const doy = Math.floor((153 * (month + (month > 2 ? -3 : 9)) + 2) / 5) + day - 1
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy
+  return era * 146097 + doe - 719468
 }
 
+/** Inverse of `toEpochDay` (civil_from_days); years are zero-padded to four digits. */
 function fromEpochDay(epochDay: number): IsoDate {
-  return new Date(epochDay * MS_PER_DAY).toISOString().slice(0, 10)
+  const z = epochDay + 719468
+  const era = Math.floor(z / 146097)
+  const doe = z - era * 146097
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365)
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100))
+  const mp = Math.floor((5 * doy + 2) / 153)
+  const day = doy - Math.floor((153 * mp + 2) / 5) + 1
+  const month = mp < 10 ? mp + 3 : mp - 9
+  const year = yoe + era * 400 + (month <= 2 ? 1 : 0)
+  const pad = (n: number, width: number) => String(n).padStart(width, '0')
+  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`
 }
 
 /** Weekday of an epoch day with Monday = 0 … Sunday = 6. */

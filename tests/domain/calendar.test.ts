@@ -82,3 +82,15 @@ describe('slipDays (ADR-002 §6, clarification 1a)', () => {
     }
   })
 })
+
+// Regression (reviewer #2857): Date.UTC mapped years 0000-0099 to 1900-1999, though the validator accepts them.
+describe('low years the validator accepts', () => {
+  it('keeps years 0000-0099 and crosses 0099/0100 by working days', () => {
+    // 0099-01-05 and 0001-01-01 are Mondays (proleptic Gregorian); 0099-12-31 is a Thursday, 0100-01-01 a Friday.
+    expect(firstWorkingDay('0099-01-05')).toBe('0099-01-05')
+    expect(firstWorkingDay('0000-01-01')).toBe('0000-01-03') // a Saturday -> Monday
+    expect(workingDayDate('0001-01-01', -1)).toBe('0000-12-29')
+    expect(workingDayDate('0099-12-31', 2)).toBe('0100-01-04')
+    expect(slipDays('0099-12-31', '0100-01-04')).toBe(2)
+  })
+})
