@@ -319,4 +319,15 @@ describe('validateDocument: all errors together', () => {
       ['duplicate-gate', undefined],
     ])
   })
+
+  // Regression (reviewer #2418): messages used String(value), so a JSON object with a bad toString threw.
+  it('reports, never throws, for field values whose toString is unusable', () => {
+    const evil = { toString: 0 }
+    const input = doc([
+      task('A', { stream: evil, status: evil, gate: evil }),
+      task('B', { gate: 'qa-complete', estimateDays: 0 }),
+      { ...task('C', { gate: 'qa-complete', estimateDays: 0 }), id: evil },
+    ])
+    expect(codesOf(input)).toEqual(['unknown-stream', 'unknown-status', 'unknown-gate', 'missing-id', 'duplicate-gate'])
+  })
 })

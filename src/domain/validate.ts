@@ -53,6 +53,17 @@ export function isIsoDate(value: unknown): value is IsoDate {
   return day >= 1 && day <= daysInMonth
 }
 
+/** Formats an unvalidated JSON value for a message without calling its own `toString` (which may be anything). */
+const show = (value: unknown): string => {
+  if (typeof value === 'string') return value
+  if (value === undefined) return 'undefined'
+  try {
+    return JSON.stringify(value) ?? typeof value
+  } catch {
+    return typeof value
+  }
+}
+
 const isGate = (value: unknown): value is Gate => (GATES as readonly unknown[]).includes(value)
 const isStatus = (value: unknown): value is Status => (STATUSES as readonly unknown[]).includes(value)
 const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string')
@@ -145,9 +156,9 @@ export function validateDocument(input: unknown): ValidationResult {
     const id = idOf(t)
     if (id === undefined) fail('missing-id', 'task id must be a non-empty string')
     if (typeof t.title !== 'string') fail('invalid-title', 'title must be a string', id)
-    if (workstreams && !workstreams.includes(t.stream)) fail('unknown-stream', `unknown stream ${String(t.stream)}`, id)
+    if (workstreams && !workstreams.includes(t.stream)) fail('unknown-stream', `unknown stream ${show(t.stream)}`, id)
     if (typeof t.ownerRole !== 'string') fail('invalid-owner-role', 'ownerRole must be a string', id)
-    if (!isStatus(t.status)) fail('unknown-status', `unknown status ${String(t.status)}`, id)
+    if (!isStatus(t.status)) fail('unknown-status', `unknown status ${show(t.status)}`, id)
     const min = isGate(t.gate) ? 0 : 1
     if (!Number.isInteger(t.estimateDays) || (t.estimateDays as number) < min || (t.estimateDays as number) > MAX_ESTIMATE_DAYS) {
       fail('invalid-estimate', `estimateDays must be an integer from ${min} to ${MAX_ESTIMATE_DAYS}`, id)
@@ -162,13 +173,13 @@ export function validateDocument(input: unknown): ValidationResult {
       if (id !== undefined && t.predecessors.includes(id)) fail('self-predecessor', `task ${id} lists itself as a predecessor`, id)
       for (const p of repeated(t.predecessors)) fail('repeated-predecessor', `repeated predecessor ${p} on task ${id ?? '?'}`, id)
     }
-    if (t.gate !== undefined && !isGate(t.gate)) fail('unknown-gate', `unknown gate ${String(t.gate)}`, id)
+    if (t.gate !== undefined && !isGate(t.gate)) fail('unknown-gate', `unknown gate ${show(t.gate)}`, id)
   }
 
   const ids = objects.flatMap((t) => idOf(t) ?? [])
   for (const id of repeated(ids)) fail('duplicate-id', `duplicate task id ${id}`, id)
   for (const gate of GATES) {
-    const owners = objects.filter((t) => t.gate === gate).map((t) => String(t.id))
+    const owners = objects.filter((t) => t.gate === gate).map((t) => show(t.id))
     if (owners.length > 1) fail('duplicate-gate', `duplicate gate ${gate} on tasks ${owners.join(', ')}`)
   }
 
