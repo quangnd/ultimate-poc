@@ -39,12 +39,20 @@ function readBody(req: IncomingMessage): Promise<string | undefined> {
   })
 }
 
+/** Loopback names only: a page on another origin that rebinds its DNS to 127.0.0.1 still sends its own Host. */
+const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost)(:\d+)?$/
+
 async function handle(store: Store, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const path = (req.url ?? '').split('?', 1)[0]!
   const method = req.method ?? ''
+  if (!LOOPBACK_HOST.test(req.headers.host ?? '')) return send(res, 403, { error: 'forbidden host' })
   const allowed = ROUTES[path]
   if (!allowed) return send(res, 404, { error: 'not found' })
   if (!allowed.includes(method)) return send(res, 405, { error: 'method not allowed' }, { allow: allowed.join(', ') })
+  // A JSON content type forces a CORS preflight, which this server never answers, so no other site can write here.
+  if (method !== 'GET' && !/^application\/json(;|$)/i.test(req.headers['content-type'] ?? '')) {
+    return send(res, 415, { error: 'content-type must be application/json' })
+  }
 
   if (method === 'GET') {
     const result = await store.load()

@@ -27,7 +27,11 @@ let dataDir: string
 let file: string
 let running: Awaited<ReturnType<typeof startServer>>
 const send = (method: string, path: string, body?: unknown) =>
-  fetch(running.url + path, { method, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) })
+  fetch(running.url + path, {
+    method,
+    headers: body === undefined ? {} : { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+  })
 
 beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), 'rrl-api-'))
@@ -180,7 +184,7 @@ describe('limits and routing', () => {
 
     // chunked: no content-length, the limit is enforced while reading
     const status = await new Promise<number>((resolve, reject) => {
-      const req = request(`${running.url}/api/import`, { method: 'POST' }, (res) => {
+      const req = request(`${running.url}/api/import`, { method: 'POST', headers: { 'content-type': 'application/json' } }, (res) => {
         res.resume()
         resolve(res.statusCode ?? 0)
       })
@@ -207,6 +211,23 @@ describe('limits and routing', () => {
       expect(res.headers.get('allow')).toBe(allow)
       expect(await res.json()).toEqual({ error: 'method not allowed' })
     }
+    expect(await readdir(dataDir)).toEqual([])
+  })
+
+  // Hardening (coordinator, from worker #3786's risk note): another site must not be able to write the local store.
+  it('refuses writes without a JSON content type (415) and requests with a non-loopback Host (403)', async () => {
+    // A cross-site "simple" request: text/plain needs no CORS preflight, so the server itself must refuse it.
+    const plain = await fetch(running.url + '/api/release', { method: 'PUT', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(good) })
+    expect(plain.status).toBe(415)
+    // DNS rebinding: the browser sends the attacker's host name.
+    const port = new URL(running.url).port
+    const status = await new Promise<number>((resolve, reject) => {
+      request({ host: '127.0.0.1', port, path: '/api/release', headers: { host: `evil.example:${port}` } }, (res) => {
+        res.resume()
+        resolve(res.statusCode ?? 0)
+      }).on('error', reject).end()
+    })
+    expect(status).toBe(403)
     expect(await readdir(dataDir)).toEqual([])
   })
 
