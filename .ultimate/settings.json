@@ -1,0 +1,9 @@
+{
+  "lander": {
+    "checks": [
+      "npm ci --no-audit --no-fund",
+      "npm run typecheck",
+      { "command": "npm test", "timeout": 300 }
+    ]
+  }
+}
