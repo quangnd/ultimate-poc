@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GATES, STATUSES, type ReleaseDocument } from '../src/domain/types'
+import { validateDocument } from '../src/domain/validate'
 
-// Structural checks on the synthetic fixtures only. Validation and forecasts are tested with the domain code.
+// Structural checks on the synthetic fixtures, then the domain validator on them.
 
 const load = (name: string) =>
   JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8')) as ReleaseDocument
@@ -186,5 +187,28 @@ describe('cycle-variant.json', () => {
     expect(ancestors(main, pred).has(task)).toBe(true)
     expect(hasCycle(main)).toBe(false)
     expect(hasCycle(variant)).toBe(true)
+  })
+})
+
+// Issue #9 AC: the fixture validates, and the domain validator rejects the cycle variant (ADR-002 §9).
+describe('fixtures under validateDocument', () => {
+  it('accepts release.json', () => {
+    expect(validateDocument(main)).toEqual({ ok: true, document: main })
+  })
+
+  it('rejects cycle-variant.json with exactly the added cycle', () => {
+    // DFS enters the loop at FW-05 (reached from FW-06); FW-05's predecessors in id order are FW-04 (done, no loop)
+    // then SEC-04 -> SEC-03 -> FW-05, the back-edge.
+    const result = validateDocument(variant)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors).toEqual([
+      {
+        code: 'cycle',
+        message: 'dependency cycle: FW-05 -> SEC-04 -> SEC-03 -> FW-05',
+        taskId: 'FW-05',
+        cycle: ['FW-05', 'SEC-04', 'SEC-03'],
+      },
+    ])
   })
 })
