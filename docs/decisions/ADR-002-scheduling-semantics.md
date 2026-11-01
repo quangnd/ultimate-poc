@@ -1,7 +1,7 @@
 # ADR-002: Scheduling, blocking and readiness semantics
 
 - Date: 2026-11-01
-- Status: Proposed
+- Status: Accepted (Product Owner, 2026-11-01, P0 gate)
 - Deciders: Product Owner (approval), coordinator (proposal)
 - Related: docs/PRD.md (US-02..US-06), docs/ARCHITECTURE.md, ADR-001
 

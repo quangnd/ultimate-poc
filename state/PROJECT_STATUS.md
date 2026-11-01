@@ -1,14 +1,14 @@
 # Project Checkpoint
 
-Updated: 2026-11-01 (13:25 UTC)
-Current phase: **P0 COMPLETE, awaiting Product Owner gate approval.** P1 not started.
-Current focus: P0 gate review (issue #2).
+Updated: 2026-11-01 (13:46 UTC)
+Current phase: **P1 IN PROGRESS** (P0 gate approved by the Product Owner 13:46 UTC; ADR-001 and ADR-002 Accepted).
+Current focus: #5 scaffold + lander checks, then #6 + #9, then #7, then #8. Merge path: GitHub PR merge only; lander runs checks, no push.
 Last verified commit: `8532805` on main (PR #3 EXP-00 baseline, PR #4 environment/capabilities/ADRs/metrics).
 Active issue: #2 (P0). Drafted for P1, blocked on the gate: #5 scaffold and lander, #6 validation, #7 scheduler, #8 blocking and readiness, #9 fixture.
-Blockers: none. ADR-001 (stack, storage and dependency list) and ADR-002 (scheduling semantics) are **Proposed** and need approval before P1.
-Next action: Product Owner approves P0 gate + ADR-001/002. Then P1 starts with #5 (scaffold + `.ultimate/settings.json` lander checks), followed by #6–#9.
+Blockers: none.
+Next action: P1 coordinator branch executes #5–#9; stop at the P1 gate.
 Decisions taken (2026-11-01, PO): one PR per issue, coordinator merges after independent review + green checks; model families kept as configured (worker sonnet-5.5 xhigh, reviewer gpt-6.1-sol medium; intended High recorded as deviation); A/B baseline model anthropic/claude-opus-5-5 medium.
-Decisions pending: ADR-001, ADR-002; P1 merge path (GitHub merge only, recommended in docs/LANDER_STRATEGY.md).
+Decisions pending: none.
 
 ## P0 evidence
 - Environment and intended-vs-actual models: docs/ENVIRONMENT.md
