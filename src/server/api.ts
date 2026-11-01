@@ -11,30 +11,30 @@ const ROUTES: Record<string, string[]> = {
   '/api/export': ['GET'],
 }
 
-/** Every response is JSON, pretty-printed like the stored file, so an export is the stored bytes. */
+/** Every response is JSON, pretty-printed like the stored file. */
 function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   res.writeHead(status, { 'content-type': 'application/json', ...headers })
   res.end(JSON.stringify(body, null, 2) + '\n')
 }
 
-/** The body text, or `undefined` once it passes the limit (the rest is read and discarded so the reply can be delivered). */
+/**
+ * The body text, or `undefined` when it passes the limit. An oversized body is still read to its end (and discarded)
+ * before the reply, so the client receives the 413 instead of a reset while it is still uploading (QA #3972).
+ */
 function readBody(req: IncomingMessage): Promise<string | undefined> {
   return new Promise((resolve, reject) => {
-    const declared = Number(req.headers['content-length'])
     const chunks: Buffer[] = []
     let size = 0
-    let tooLarge = declared > BODY_LIMIT
-    if (tooLarge) resolve(undefined)
+    let tooLarge = Number(req.headers['content-length']) > BODY_LIMIT
     req.on('data', (chunk: Buffer) => {
       if (tooLarge) return
       size += chunk.length
       if (size > BODY_LIMIT) {
         tooLarge = true
         chunks.length = 0
-        resolve(undefined)
       } else chunks.push(chunk)
     })
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('end', () => resolve(tooLarge ? undefined : Buffer.concat(chunks).toString('utf8')))
     req.on('error', reject)
   })
 }
@@ -55,10 +55,13 @@ async function handle(store: Store, req: IncomingMessage, res: ServerResponse): 
   }
 
   if (method === 'GET') {
-    const result = await store.load()
+    const exporting = path === '/api/export'
+    const result = exporting ? await store.exportText() : await store.load()
     if (result.ok) {
-      const headers: Record<string, string> = path === '/api/export' ? { 'content-disposition': 'attachment; filename="release.json"' } : {}
-      return send(res, 200, result.document, headers)
+      if (!('text' in result)) return send(res, 200, result.document)
+      // Export is the stored file itself, byte for byte (QA #3972).
+      res.writeHead(200, { 'content-type': 'application/json', 'content-disposition': 'attachment; filename="release.json"' })
+      return void res.end(result.text)
     }
     return 'missing' in result && result.missing ? send(res, 404, { error: 'no release' }) : send(res, 500, { errors: result.errors })
   }

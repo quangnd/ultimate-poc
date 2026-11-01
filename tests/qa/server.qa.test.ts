@@ -770,11 +770,8 @@ describe('API: GET /api/export', () => {
     }
   })
 
-  // KNOWN DEVIATION (reported to #1510): the contract says export is "byte-identical to the file". For files the store
-  // wrote that holds, but the server re-serializes the loaded document, so a hand-edited valid file comes back in the
-  // canonical layout. `it.fails` keeps this green while it is so; when the server serves the file's own bytes this
-  // test fails with "expected to fail": change it to a plain `it`.
-  it.fails('serves the file\'s own bytes, also when a valid file was laid out differently by hand', async () => {
+  // Was a known deviation (export re-serialized the document); the server now serves the file's own bytes.
+  it('serves the file\'s own bytes, also when a valid file was laid out differently by hand', async () => {
     const s = await boot()
     for (const text of handLaidOut()) {
       await writeFile(s.file, text)

@@ -1,8 +1,8 @@
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, open, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReleaseDocument } from '../../src/domain/types'
 import { createStore } from '../../src/server/store'
 
@@ -137,5 +137,23 @@ describe('createStore', () => {
     await mkdir(blocker)
     expect(await store.save(variant(7))).toEqual({ ok: true })
     expect(await store.load()).toEqual({ ok: true, document: variant(7) })
+  })
+
+  // Regression (reviewer #4342): a failing directory fsync was swallowed, so the save reported success.
+  it('fails the save when the directory cannot be fsynced', async () => {
+    // The first sync is the tmp file's, the second the directory's: fail only the second.
+    const probe = await open(join(dir, 'probe'), 'w')
+    const FileHandle = Object.getPrototypeOf(probe) as { sync(): Promise<void> }
+    await probe.close()
+    const real = FileHandle.sync
+    const spy = vi.spyOn(FileHandle, 'sync').mockImplementation(async function (this: unknown) {
+      if (spy.mock.calls.length >= 2) throw Object.assign(new Error('EIO: i/o error, fsync'), { code: 'EIO' })
+      return real.call(this)
+    })
+    try {
+      await expect(createStore(join(dir, 'data')).save(good)).rejects.toThrow('EIO')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

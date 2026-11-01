@@ -17,6 +17,8 @@ export interface Store {
   file: string
   /** Reads and validates the stored document; a missing, corrupt or invalid file is reported, never repaired. */
   load(): Promise<LoadResult>
+  /** Like `load`, but returns the file's exact bytes once they validate. */
+  exportText(): Promise<{ ok: true; text: string } | Exclude<LoadResult, { ok: true }>>
   /** Validates, then replaces the stored document atomically; an invalid document leaves the file untouched. */
   save(doc: unknown): Promise<SaveResult>
 }
@@ -37,35 +39,46 @@ export function createStore(dir: string): Store {
       await handle.close()
     }
     await rename(tmp, file)
-    // Makes the rename itself durable; not every platform can open a directory, so this is best effort.
+    // Makes the rename itself durable (macOS/Linux open and fsync directories). A failure is a failed save, never
+    // a silent success (reviewer #4342).
+    const dirHandle = await open(dir, 'r')
     try {
-      const dirHandle = await open(dir, 'r')
-      try {
-        await dirHandle.sync()
-      } finally {
-        await dirHandle.close()
-      }
-    } catch {}
+      await dirHandle.sync()
+    } finally {
+      await dirHandle.close()
+    }
+  }
+
+  /** The stored file's text with its validation result; `text` is the exact bytes export serves (QA #3972). */
+  async function read(): Promise<{ ok: true; document: ReleaseDocument; text: string } | Exclude<LoadResult, { ok: true }>> {
+    let text: string
+    try {
+      text = await readFile(file, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, missing: true }
+      throw error
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(text)
+    } catch (error) {
+      return { ok: false, errors: [{ code: 'invalid-json', message: (error as Error).message }] }
+    }
+    const result = validateDocument(parsed)
+    return result.ok ? { ...result, text } : result
   }
 
   return {
     file,
 
     async load() {
-      let text: string
-      try {
-        text = await readFile(file, 'utf8')
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, missing: true }
-        throw error
-      }
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(text)
-      } catch (error) {
-        return { ok: false, errors: [{ code: 'invalid-json', message: (error as Error).message }] }
-      }
-      return validateDocument(parsed)
+      const result = await read()
+      return result.ok ? { ok: true, document: result.document } : result
+    },
+
+    async exportText() {
+      const result = await read()
+      return result.ok ? { ok: true, text: result.text } : result
     },
 
     async save(doc) {
