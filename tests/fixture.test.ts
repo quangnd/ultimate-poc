@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GATES, STATUSES, type ReleaseDocument } from '../src/domain/types'
+import { schedule } from '../src/domain/schedule'
 import { validateDocument } from '../src/domain/validate'
 
 // Structural checks on the synthetic fixtures, then the domain validator on them.
@@ -187,6 +188,20 @@ describe('cycle-variant.json', () => {
     expect(ancestors(main, pred).has(task)).toBe(true)
     expect(hasCycle(main)).toBe(false)
     expect(hasCycle(variant)).toBe(true)
+  })
+})
+
+// Issue #9 AC: a firmware estimate change moves the release finish (fixtures/README.md, hand-computed there).
+describe('firmware-delay scenario', () => {
+  it('FW-03 5 -> 8 days moves the release finish from day 27 to day 30', () => {
+    const baseline = schedule(main)
+    const delayed = structuredClone(main)
+    taskOf(delayed, 'FW-03').estimateDays = 8
+    const late = schedule(delayed)
+
+    expect([baseline.day0, baseline.finish, baseline.finishDate, baseline.slipDays]).toEqual(['2027-01-04', 27, '2027-02-10', -2])
+    expect([late.finish, late.finishDate, late.slipDays]).toEqual([30, '2027-02-15', 1])
+    expect(validateDocument(delayed).ok).toBe(true)
   })
 })
 
