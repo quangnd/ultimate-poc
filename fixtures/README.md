@@ -15,7 +15,8 @@ Raise FW-03 (display timing fix) `estimateDays` from 5 to 8 (+3). Projected rele
 - **Baseline:** day 27 = Wed 2027-02-10, 2 working days before target.
 - **Delayed:** day 30 = Mon 2027-02-15, 1 working day after target.
 
-FW-03 is on the chain FW-02 → FW-03 → FW-04 → FW-05 → SEC-03 → SEC-04 → SEC-05 → QA-03 → QA-04. Each task starts the day after its
+FW-03 is on the zero-slack path FW-02 → FW-03 → FW-04 → FW-05 → SEC-03 → SEC-04 → SEC-05 → QA-03 → QA-04. (The ADR-002 §7
+driving chain is this path without QA-04: the 0-day gate ties QA-03's finish and the walk starts at the smaller id.) Each task starts the day after its
 predecessor finishes (done tasks finish at −1; a 0-day gate finishes at its earliest − 1, shown as `fin`), so there is no slack to absorb the change:
 
 | start–finish day | FW-02 | FW-03 | FW-04 | FW-05 | SEC-03 | SEC-04 | SEC-05 | QA-03 | QA-04 |
