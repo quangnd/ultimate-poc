@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "startDate": "2027-01-04",
+    "targetDate": "2027-02-12"
+  },
+  "workstreams": ["FW", "SPS", "Security", "App", "QA"],
+  "tasks": [
+    {
+      "id": "FW-01",
+      "title": "Freeze Aurora bootloader baseline",
+      "stream": "FW",
+      "ownerRole": "fw-lead",
+      "status": "done",
+      "estimateDays": 3,
+      "predecessors": []
+    },
+    {
+      "id": "FW-02",
+      "title": "Rework sensor driver",
+      "stream": "FW",
+      "ownerRole": "fw-engineer",
+      "status": "in_progress",
+      "estimateDays": 3,
+      "targetDate": "2027-01-08",
+      "predecessors": ["FW-01"]
+    },
+    {
+      "id": "FW-03",
+      "title": "Fix display timing in power-management firmware",
+      "stream": "FW",
+      "ownerRole": "fw-engineer",
+      "status": "todo",
+      "estimateDays": 5,
+      "targetDate": "2027-01-15",
+      "predecessors": ["FW-02"]
+    },
+    {
+      "id": "FW-04",
+      "title": "Build over-the-air update client",
+      "stream": "FW",
+      "ownerRole": "fw-engineer",
+      "status": "todo",
+      "estimateDays": 4,
+      "predecessors": ["FW-03"]
+    },
+    {
+      "id": "FW-05",
+      "title": "Produce integrated firmware build",
+      "stream": "FW",
+      "ownerRole": "fw-lead",
+      "status": "todo",
+      "estimateDays": 2,
+      "predecessors": ["FW-04"]
+    },
+    {
+      "id": "FW-06",
+      "title": "Gate: firmware integrated",
+      "stream": "FW",
+      "ownerRole": "release-manager",
+      "status": "todo",
+      "estimateDays": 0,
+      "targetDate": "2027-01-22",
+      "predecessors": ["FW-05"],
+      "gate": "fw-integrated"
+    },
+    {
+      "id": "SPS-01",
+      "title": "Provision device identity service",
+      "stream": "SPS",
+      "ownerRole": "sps-engineer",
+      "status": "done",
+      "estimateDays": 4,
+      "predecessors": []
+    },
+    {
+      "id": "SPS-02",
+      "title": "Set up update-server staging environment",
+      "stream": "SPS",
+      "ownerRole": "sps-engineer",
+      "status": "in_progress",
+      "estimateDays": 3,
+      "predecessors": ["SPS-01"]
+    },
+    {
+      "id": "SPS-03",
+      "title": "Implement fleet configuration API",
+      "stream": "SPS",
+      "ownerRole": "sps-engineer",
+      "status": "todo",
+      "estimateDays": 4,
+      "predecessors": ["SPS-02"]
+    },
+    {
+      "id": "SPS-04",
+      "title": "Run update-server contract test against OTA client",
+      "stream": "SPS",
+      "ownerRole": "sps-lead",
+      "status": "todo",
+      "estimateDays": 3,
+      "predecessors": ["SPS-03", "FW-04"]
+    },
+    {
+      "id": "SEC-01",
+      "title": "Review kiosk threat model",
+      "stream": "Security",
+      "ownerRole": "security-engineer",
+      "status": "done",
+      "estimateDays": 3,
+      "predecessors": []
+    },
+    {
+      "id": "SEC-02",
+      "title": "Plan secure-boot key ceremony",
+      "stream": "Security",
+      "ownerRole": "security-engineer",
+      "status": "in_progress",
+      "estimateDays": 3,
+      "predecessors": ["SEC-01"]
+    },
+    {
+      "id": "SEC-03",
+      "title": "Set up firmware signing pipeline",
+      "stream": "Security",
+      "ownerRole": "security-engineer",
+      "status": "todo",
+      "estimateDays": 4,
+      "predecessors": ["SEC-02", "FW-05"]
+    },
+    {
+      "id": "SEC-04",
+      "title": "Penetration-test the update path",
+      "stream": "Security",
+      "ownerRole": "security-lead",
+      "status": "todo",
+      "estimateDays": 5,
+      "predecessors": ["SEC-03", "SPS-04"]
+    },
+    {
+      "id": "SEC-05",
+      "title": "Gate: security verified",
+      "stream": "Security",
+      "ownerRole": "release-manager",
+      "status": "todo",
+      "estimateDays": 0,
+      "targetDate": "2027-02-05",
+      "predecessors": ["SEC-04"],
+      "gate": "security-verified"
+    },
+    {
+      "id": "APP-01",
+      "title": "Build kiosk UI shell",
+      "stream": "App",
+      "ownerRole": "app-developer",
+      "status": "done",
+      "estimateDays": 5,
+      "predecessors": []
+    },
+    {
+      "id": "APP-02",
+      "title": "Build checkout flow screens",
+      "stream": "App",
+      "ownerRole": "app-developer",
+      "status": "in_progress",
+      "estimateDays": 6,
+      "predecessors": ["APP-01"]
+    },
+    {
+      "id": "APP-03",
+      "title": "Integrate diagnostics screen with firmware API",
+      "stream": "App",
+      "ownerRole": "app-developer",
+      "status": "todo",
+      "estimateDays": 3,
+      "predecessors": ["APP-02", "FW-06"]
+    },
+    {
+      "id": "APP-04",
+      "title": "Add offline mode",
+      "stream": "App",
+      "ownerRole": "app-developer",
+      "status": "todo",
+      "estimateDays": 4,
+      "predecessors": ["APP-02"]
+    },
+    {
+      "id": "APP-05",
+      "title": "Gate: app integration complete",
+      "stream": "App",
+      "ownerRole": "release-manager",
+      "status": "todo",
+      "estimateDays": 0,
+      "targetDate": "2027-01-29",
+      "predecessors": ["APP-03", "APP-04"],
+      "gate": "app-integration"
+    },
+    {
+      "id": "QA-01",
+      "title": "Prepare test plan and device lab",
+      "stream": "QA",
+      "ownerRole": "qa-engineer",
+      "status": "in_progress",
+      "estimateDays": 3,
+      "predecessors": []
+    },
+    {
+      "id": "QA-02",
+      "title": "Run regression suite on integrated firmware",
+      "stream": "QA",
+      "ownerRole": "qa-engineer",
+      "status": "todo",
+      "estimateDays": 4,
+      "predecessors": ["QA-01", "FW-06"]
+    },
+    {
+      "id": "QA-03",
+      "title": "Run end-to-end kiosk soak test",
+      "stream": "QA",
+      "ownerRole": "qa-lead",
+      "status": "todo",
+      "estimateDays": 5,
+      "predecessors": ["QA-02", "APP-05", "SEC-05"]
+    },
+    {
+      "id": "QA-04",
+      "title": "Gate: QA complete",
+      "stream": "QA",
+      "ownerRole": "release-manager",
+      "status": "todo",
+      "estimateDays": 0,
+      "targetDate": "2027-02-12",
+      "predecessors": ["QA-03"],
+      "gate": "qa-complete"
+    }
+  ]
+}
