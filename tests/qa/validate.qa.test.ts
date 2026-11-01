@@ -785,12 +785,13 @@ describe('all errors are reported together', () => {
       { release: { startDate: '2026-02-30', targetDate: 'soon' } },
     )
 
+    // Clarification 5 (ADR-002 "Clarifications (P1)"): with a missing or duplicate id the graph is undefined, so no
+    // cycle is searched; the A <-> B cycle together with other errors is covered by the test above.
     const errors = errorsOf(input)
     expect(errors.map((e) => e.code).sort()).toEqual(
       [
         'invalid-start-date',
         'invalid-target-date', // release.targetDate
-        'cycle',
         'invalid-title', // C
         'invalid-owner-role', // C
         'unknown-stream', // C
@@ -809,8 +810,6 @@ describe('all errors are reported together', () => {
     )
 
     // Spot-check what the contract pins exactly.
-    expect(errors.find((e) => e.code === 'cycle')?.cycle).toEqual(['A', 'B'])
-    expect(errors.find((e) => e.code === 'cycle')?.message).toBe('dependency cycle: A -> B -> A')
     const unknown = errors.find((e) => e.code === 'unknown-predecessor')
     expect(unknown?.message).toBe('unknown predecessor ZZ on task C')
     expect(unknown?.taskId).toBe('C')

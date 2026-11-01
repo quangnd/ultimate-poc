@@ -160,3 +160,18 @@ stored data unchanged and shows every error.
 Revisit when: holidays, partial days or per-person capacity are requested; the operator needs targets to constrain
 the plan; a P1 test or the Product Owner finds the driving-chain result misleading on the fixture; or gates need
 behaviour that tasks cannot express.
+
+## Clarifications (P1)
+
+Readings of the text above that P1 found open. They add no new behaviour; the Product Owner reviews them at the P1
+gate. Each is added in the PR that implements it.
+
+3. **Fields §9 does not name** (`title`, `ownerRole`, `workstreams`): structural checks only. They must be a string
+   or an array of strings; empty values are allowed. (#6)
+4. **Cycle report:** the cycle is the depth-first-search stack slice from the revisited task to the current one, in
+   visiting order along predecessor edges. For example A→B→A is reported as `["A","B"]` with the message
+   `dependency cycle: A -> B -> A`. Ascending order means code-unit order, as in §5. A self-link is reported only as
+   a self-link, never also as a cycle. (#6)
+5. **No cycle search on an undefined graph:** when an id is missing or duplicated, or a task is not an object, the
+   cycle search is skipped and only those errors are reported. A cycle among valid ids is reported once they are
+   fixed. (#6)
