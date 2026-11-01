@@ -38,8 +38,11 @@ written as `~` or `<home>`.
 | openai-codex (subscription) | ready |
 | claude-code | `not_ready` in plain Pi. Ultimate uses it through its own `claude-code` extension, which uses the external Claude Code CLI login (see "Actual models" below: it answers in Ultimate) |
 
-Consequence for the A/B baseline (p0-decisions): plain Pi cannot use `claude-code/*`, so both arms use
-`anthropic/claude-opus-5-5` medium.
+Consequence for the A/B baseline: plain Pi cannot use `claude-code/*`, so the **intended** control (p0-decisions) was
+both arms on `anthropic/claude-opus-5-5` medium. **Actual** in EXP-00: arm A (plain Pi) ran `anthropic/claude-opus-5-5`
+medium, arm B (Ultimate worker) ran `github-copilot/claude-sonnet-5.5` xhigh, because the `subagent` tool has no
+per-run model override (see "Not recorded / limits"). The EXP-00 comparison is therefore **confounded** by model
+(experiments/EXP-00/SUMMARY.md).
 
 ## Extensions (Ultimate d0a2e17, built-in, none project-local)
 
@@ -90,7 +93,7 @@ Snapshot taken 2026-11-01 ~13:05Z while conversations were still running; counts
 |---|---|---|---|---|
 | Coordinator / @ultimate | claude-code/claude-opus-5-5 medium | same | #52 @ultimate: pi.agent `claude-code/claude-opus-5-5`, `medium`; 25 trace model rows on that model. #215 coordinator: pi.agent same, `medium`; trace rows `claude-code/claude-opus-5-5` | none |
 | Worker | High thinking | github-copilot/claude-sonnet-5.5 **xhigh** | #436 worker: pi.agent `github-copilot/claude-sonnet-5.5`, `xhigh`; 19 trace model rows on that model | thinking xhigh instead of high, kept by user decision (p0-decisions 2b) |
-| Reviewer | High thinking | openai-codex/gpt-6.1-sol **medium** | reviewer run of this branch: see experiments/EXP-00/instrumentation-check.md | thinking medium instead of high, kept by user decision |
+| Reviewer | High thinking | openai-codex/gpt-6.1-sol **medium** | #1106 reviewer of this branch: pi.agent `openai-codex/gpt-6.1-sol`, `medium`; 17 trace model rows (`caller: agent`) on that model; pi.usage 648,341 tokens on it (+3,191 Sonnet summary tokens) | thinking medium instead of high, kept by user decision |
 | Scout / watcher | openai-codex/gpt-6-luna low | same | #413 scout: pi.agent `openai-codex/gpt-6-luna`, `low`; 7 trace model rows on that model (the scout also reported "Returned model: openai-codex/gpt-6-luna") | none (watcher not run in P0) |
 | Summaries | (not specified) | github-copilot/claude-sonnet-5.5 | small Sonnet entries in pi.usage of #52, #215, #413 | pinned in user settings |
 

@@ -65,6 +65,9 @@ Serial list scheduling over the dependency graph (after validation, §9):
 3. Schedule the eligible task with the **smallest `earliest`**; ties are broken by **task `id` in ascending
    lexicographic (code-unit) order**. Set its start to `earliest`, finish to `start + d − 1` (a 0-day gate finishes on
    `earliest − 1`, i.e. at the same moment as its latest predecessor), and for `d ≥ 1` set `streamFree = finish + 1`.
+   Record for each scheduled task its `capacityBinder`: the task that last set `streamFree` of its stream before it was
+   scheduled (none for the first task of a stream, for 0-day gates and for `done` tasks). 0-day gates and `done` tasks
+   never set `streamFree`, so they are never a capacity binder.
 
 Input order of tasks or links never affects the result; `id` is the only tie-breaker. Identical documents give
 byte-identical forecasts (asserted by a test that shuffles input order).
@@ -83,10 +86,13 @@ The projected release finish is the latest forecast finish of all tasks.
 - **Blocking task (release level, US-05):** a task that is not `done` and is a direct or transitive predecessor of
   a mandatory gate (§8). Marking a task `done` while a predecessor is open is *allowed* (status reports can lag),
   but it is reported as an inconsistency, and the open predecessor still counts as blocking.
-- **Driving chain:** start from the task with the latest forecast finish (ties: smallest `id`) and walk backwards.
-  At each task, its start was bound either by a predecessor (one whose `finish = start − 1`) or by its stream (the
-  previous task on that stream, with `finish = start − 1`). Follow the predecessor if one binds (smallest `id` on ties),
-  otherwise the stream. Stop at a task that starts on day 0.
+- **Driving chain:** if every task is `done`, the chain is empty and the release forecast is "complete". Otherwise
+  start from the open task with the latest forecast finish (ties: smallest `id`) and walk backwards. At each task `X`
+  (start `s`): if a predecessor `P` that is not `done` has `finish = s − 1`, step to it (smallest `id` on ties);
+  otherwise, if `X.capacityBinder` exists and has `finish = s − 1`, step to it; otherwise stop. The walk always terminates,
+  because every step goes to a task scheduled earlier. Example: A/FW 2 days, B/App 1 day, gate G/FW 0 days after B, T/FW
+  1 day after G gives A `[0,1]`, B `[0,0]`, G start 1 / finish 0, T `[2,2]`; from T no predecessor binds (G finishes
+  on 0), T's capacity binder is A (finish 1 = 2 − 1), so the chain is T ← A.
 - **Critical blocker (US-06):** a blocking task (release level) that lies on the driving chain, i.e. an open task
   whose delay moves the projected finish under the v1 assumptions. The UI labels the driving chain "driving chain
   under v1 capacity assumptions", not "critical path"; no claim of mathematical optimality is made.
