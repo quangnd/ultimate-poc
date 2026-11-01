@@ -68,14 +68,24 @@ every non-equivalent mutant was killed. Totals: validator 15+, scheduler 28, rea
 - **Blocker found:** the lander reads checks via `host.projectSettings()`, which returns `{}` unless the project's
   `.ultimate/` setup is trusted (ultimate `server/project-setup.ts`). The project was "undecided", so the sync landing
   of 25a1a06 ran **no checks** (lander #28: landed, "Not pushed", no check steps). Reported to @ultimate; the PO
-  trust decision is pending, and the failing-test refusal proof waits for it.
+  trusted the project on the trust card (~14:56 UTC). A chat message saying "I trust the project" did not change
+  the setting; only the card did.
+- **Gate proof: PASS (2026-11-01 14:57:56–14:58:06 UTC).** The throwaway commit 189f889 (on 5b52784) added
+  `tests/lander-proof.test.ts` with `expect(1 + 1).toBe(3)`, and `workspace submit` sent it as
+  `1510-189f889-mvxyfhzn`. The lander ran `npm ci --no-audit --no-fund`, then `npm run typecheck` (passed), then
+  `npm test`: 1 failed, 587 passed. The failing check reran once and failed again, so the result was "not landed:
+  check failed twice: npm test". Local main stayed at 5b52784 and nothing was pushed. Evidence: lander conversation
+  #28, entries 3631–3657 (`ultimate.lander`), and the refusal message in #1510. The throwaway commit was discarded
+  (worktree reset to origin/main) and was never pushed or opened as a PR.
 - `npm ci` vs worktree setup: `npm ci` takes 0.7–1.0 s with a warm cache (17 s cold first install), so a setup step
   buys nothing; checks keep `npm ci`.
-- Until the proof, checks were run manually by the coordinator in its worktree before every PR (exit codes in each PR).
+- Until the proof, the coordinator ran checks manually in its worktree before every PR (exit codes in each PR). From
+  now on the lander runs the same checks on every `workspace submit`.
 
 ## Interventions
 
-- Human (PO): 0 so far in P1. The project-trust decision is pending.
+- Human (PO): 1, the project-trust decision. It took two prompts, because the first answer was given in chat and not
+  on the card. P1 gate approved, together with ADR-002 clarifications 1–5 and the driving-chain limit.
 - @ultimate decisions in the PO's place: 1 message (clarifications 1a, 2a, 3a, 4), 13:48 UTC.
 - Worker questions: #1666 asked once (vitest picked up experiments/ tests; coordinator approved `vitest.config.ts`).
 - Coordinator repairs: D1, D2, D3 assertion, D4 README, D5 comment (all in coordinator commits, each reviewed).
