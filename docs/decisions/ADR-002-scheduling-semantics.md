@@ -169,6 +169,12 @@ gate. Each is added in the PR that implements it.
 1. **`slipDays` counting (§6):** when the forecast finish is after the target, slip is +(working days in (target,
    finish]). When it is before, slip is −(working days in (finish, target]). Equal dates give 0. A weekend target date
    counts as the Friday before it. A `done` task's forecast finish is day −1, the working day before day 0. (#7)
+2. **Inconsistencies and readiness (§7, §8):** the §8 rule is applied literally. An inconsistency (a `done` task
+   with an open predecessor) never makes the release NOT READY on its own. When the release is NOT READY for another
+   reason, each inconsistency is listed last among the reasons, sorted by task id. Inconsistencies are always exposed
+   in their own list. Consequence: once all four gates are `done`, any remaining blocking task sits upstream of a
+   `done` gate, so some `done` task on that path is an inconsistency, and "blocking tasks" comes with an inconsistency
+   reason. (#8)
 3. **Fields §9 does not name** (`title`, `ownerRole`, `workstreams`): structural checks only. They must be a string
    or an array of strings; empty values are allowed. (#6)
 4. **Cycle report:** the cycle is the depth-first-search stack slice from the revisited task to the current one, in
