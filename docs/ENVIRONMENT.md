@@ -1,6 +1,6 @@
 # Environment (P0)
 
-Recorded 2026-11-01 (Europe, UTC+01:00) by the P0 coordinator branch (Ultimate conversation #215).
+Recorded 2026-11-01 (machine time zone UTC+07:00; times below in UTC) by the P0 coordinator branch (Ultimate conversation #215).
 Every value below was observed with the command or API named next to it. No credentials are printed; home paths are
 written as `~` or `<home>`.
 
@@ -101,6 +101,11 @@ GitHub Copilot, OpenAI Codex) are **subscriptions**, so the USD figure is a **li
 Experiments report tokens as the primary measure and USD only labelled as proxy. `tools/metrics/` extracts both.
 
 ## Not recorded / limits
+
+- **Per-run model override for subagents: NOT AVAILABLE.** The `subagent` tool takes `agent`, `task`, `background`,
+  `fork`, `isolate`, but no model or thinking parameter. The model is chosen only by the agent definition's family
+  (observed by root #52; the worker in EXP-00 ran `github-copilot/claude-sonnet-5.5` xhigh, trace of #381). Changing it
+  means changing the family or the definition, which is shared Ultimate configuration (approval gate).
 
 - The trace store's retention was not characterised in P0 (see tools/metrics/README.md for what was observed).
 - Exact plain-Pi behaviour on `claude-code` was not explored beyond `not_ready`.
