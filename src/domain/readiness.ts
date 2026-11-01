@@ -61,7 +61,8 @@ export function assessReadiness(doc: ReleaseDocument, forecast: ForecastLike): R
     blocked.push([task.id, openPredecessors])
     if (task.status === 'done') inconsistencies.push({ taskId: task.id, openPredecessors })
   }
-  const blockedBy = Object.fromEntries(blocked)
+  // Null prototype: a task id such as `constructor` must never find an inherited Object property (reviewer #4342).
+  const blockedBy: Record<string, string[]> = Object.assign(Object.create(null), Object.fromEntries(blocked))
 
   // §7 release level: open tasks that precede a gate task, directly or through any path (also through done tasks).
   const ancestors = new Set<string>()

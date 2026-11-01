@@ -6,6 +6,7 @@ export function DashboardView({ dashboard }: { dashboard: Dashboard }) {
     <>
       <Summary d={dashboard} />
       <Reasons d={dashboard} />
+      <Inconsistencies d={dashboard} />
       <div className="forecast-grid">
         <Forecast d={dashboard} />
         <Assumptions />
@@ -90,11 +91,31 @@ function Reasons({ d }: { d: Dashboard }) {
           </li>
         ))}
       </ol>
-      {readiness.inconsistencies.length > 0 && (
-        <p className="section-note">
-          Inconsistent statuses never make a release not ready on their own; they are listed because another reason applies.
-        </p>
-      )}
+    </section>
+  )
+}
+
+/** ADR-002 clarification 2: always shown in their own list, also when the release is READY (reviewer #4342). */
+function Inconsistencies({ d }: { d: Dashboard }) {
+  const { inconsistencies } = d.readiness
+  if (inconsistencies.length === 0) return null
+  return (
+    <section className="section" aria-labelledby="inconsistencies-title">
+      <h2 id="inconsistencies-title">Status inconsistencies</h2>
+      <p className="section-note">
+        Tasks marked done while a predecessor is still open. Allowed, because status reports can lag, but worth checking.
+        On their own they never make the release not ready.
+      </p>
+      <ul className="reasons">
+        {inconsistencies.map(({ taskId, openPredecessors }) => (
+          <li key={taskId} className="reason reason-inconsistency">
+            <span className="reason-head">
+              <Id id={taskId} /> is done, but its predecessors are not
+            </span>
+            <IdList ids={openPredecessors} label="Open predecessors" />
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

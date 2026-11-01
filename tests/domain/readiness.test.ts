@@ -349,4 +349,13 @@ describe('readiness (ADR-002 §8)', () => {
     expect(r.blockingTasks).toEqual([])
     expect(r.inconsistencies).toEqual([{ taskId: 'DONE', openPredecessors: ['P'] }])
   })
+
+  // Regression (reviewer #4342): blockedBy was a plain object, so the valid id `constructor` found Object's property.
+  it('has no inherited entries in blockedBy for ids like constructor', () => {
+    const d = doc([...gateTasks(), task('constructor', 'FW', 1), task('toString', 'FW', 1, ['constructor'])])
+    const r = assessReadiness(d, flatForecast(d))
+    expect(r.blockedBy['constructor']).toBeUndefined()
+    expect(r.blockedBy['toString']).toEqual(['constructor'])
+    expect(r.blockedBy['hasOwnProperty']).toBeUndefined()
+  })
 })
