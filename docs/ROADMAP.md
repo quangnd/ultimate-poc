@@ -26,3 +26,6 @@ Run EXP-01..06 defined in docs/EVALUATION.md with evidence. Features absent in t
 
 ## P4 gate
 Compare at least 3 matched tasks in both environments, record effort, interventions, quality, cost proxies, recovery and regression rate; conclude adopt / selectively reuse / defer.
+
+## Execution ownership and autonomy
+Human approves phase objectives and reviews gate evidence. Coordinator runs all within-phase execution, including issue planning, task assignment, implementation, tests, review, routine fixes and progress updates. Reviewer and QA should be independent of the implementation where the environment supports it. No repeated human approvals for ordinary within-phase work. At a gate, coordinator must provide a concise summary and explicit next-phase recommendation; wait for phase approval. This is a supervised agent workflow, not a guarantee of background or unattended execution.
