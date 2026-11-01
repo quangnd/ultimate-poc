@@ -4,7 +4,7 @@
 export const STATUSES = ['todo', 'in_progress', 'done'] as const
 export type Status = (typeof STATUSES)[number]
 
-/** The four mandatory readiness gates; each value must appear on exactly one task (ADR-002 §8). */
+/** The four mandatory readiness gates: each value may appear on at most one task, and all four are required for READY (ADR-002 §8). */
 export const GATES = ['fw-integrated', 'security-verified', 'app-integration', 'qa-complete'] as const
 export type Gate = (typeof GATES)[number]
 
