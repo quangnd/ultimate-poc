@@ -1,7 +1,7 @@
 # ADR-001: Application stack and local storage
 
 - Date: 2026-11-01
-- Status: Proposed
+- Status: Accepted (Product Owner, 2026-11-01, P0 gate)
 - Deciders: Product Owner (approval), coordinator (proposal)
 - Related: docs/PRD.md (US-01, US-07, US-08), docs/ARCHITECTURE.md, ADR-002
 
