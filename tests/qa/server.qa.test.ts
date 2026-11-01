@@ -947,24 +947,11 @@ describe('API: requests are serialized', () => {
 })
 
 /**
- * Sends an oversized body until an answer is read. A server that answers 413 and drops the socket while the client is
- * still uploading can make the client see ECONNRESET/EPIPE instead of the answer (observed on about 1 upload in 10 of
- * 1 MiB + 1 against the reference run, more for larger bodies; reported to #1510), so a reset is retried. Whatever
- * answer is finally read is asserted by the caller, and a 2xx can never hide behind a retry.
+ * Sends an oversized body. The server reads the body to its end before answering, so the client always receives the
+ * 413: a reset (ECONNRESET/EPIPE, seen in 11-70% of uploads before that fix) fails the test, no retries (reviewer #4619).
  */
-async function oversized(base: string, method: string, path: string, opts: ReqOpts): Promise<Res> {
-  let last: unknown
-  for (let attempt = 0; attempt < 40; attempt++) {
-    try {
-      return await request(base, method, path, opts)
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      if (code !== 'ECONNRESET' && code !== 'EPIPE') throw error
-      last = error
-    }
-  }
-  throw last
-}
+const oversized = (base: string, method: string, path: string, opts: ReqOpts): Promise<Res> =>
+  request(base, method, path, opts)
 
 describe('API: body size limit', () => {
   it('a body of exactly 1 MiB is accepted; one byte more is 413, on both write routes, and nothing is stored', async () => {
