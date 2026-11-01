@@ -31,3 +31,12 @@ Public repo: only synthetic release data. Never commit secrets, tokens, company 
 
 ## Quality bar
 Functional correctness precedes agent cleverness. Keep changes minimal. Every issue has observable AC and a reproducible verification. Document unsupported features as NOT AVAILABLE, not FAIL. Distinguish infrastructure errors from agent errors. Use consistent experiment IDs.
+
+## Autonomous execution policy (human-on-the-loop)
+The operator acts as Product Owner and supervisor, not task dispatcher. After the human approves a phase goal and its guardrails, coordinator may autonomously break work into issues, delegate, implement, run tests, review, fix ordinary failures, update issues and checkpoints, and submit PRs. Routine actions inside approved scope do not require repeated permission. Coordinator should choose sequential versus parallel agents based on benefit and conflict risk.
+
+**Approval gates:** P0 initial plan; each subsequent phase transition; material scope or architecture change; additional spending or new credentials/access; destructive operations; changing Pi/Ultimate shared configuration, skills or extensions; releasing outside local sandbox. Never interpret silence as approval. Do not require approval for an ordinary retry, normal bug fix, test execution, safe branch creation or PR draft. Autonomous operation is limited to the current approved phase, not unlimited unattended background execution.
+
+**Review package:** At each phase gate present (1) accomplished vs acceptance criteria with PASS/FAIL, (2) demos/screenshots or reproducible commands, (3) independent QA/reviewer findings, (4) measures and experiment links, (5) unresolved risks/decisions, (6) proposed next phase and clear approval question. Minimize human burden: summarize rather than asking the human to inspect raw logs.
+
+**Blocked handling:** Attempt up to two distinct, safe fixes to a routine blocker, recording causes and evidence. Escalate if repeated failure, uncertain permissions, missing external dependencies, or a design choice that affects agreed scope. Never bypass failing tests or invent completion evidence.
