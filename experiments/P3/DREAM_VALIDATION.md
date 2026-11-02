@@ -111,3 +111,38 @@ Remaining risk: a cold-cache install dropped one optional package once (see abov
 Blind QA #10293 independently passed AC1-4, 6 and 7 (concurrent 5611/5711 and 5612/5712 both 6 passed; defaults collided with `Port 5273 is already in use`); the hung-holder case it found (a holder on the web port that accepts but never replies hung `webServer.url` for over 120 s) is fixed by `webServer.port`: with such a holder on 5621, `WEB_PORT=5621 API_PORT=5721 npm run test:e2e` exits 1 in 1.6 s with `http://localhost:5621 is already used`.
 
 Outcome: VALIDATED (6 of 6 counted concurrent "after" runs passed; the first attempt is excluded as an infrastructure fault, see above)
+
+## #7/#6/#14 validation run
+
+Issue [#41](https://github.com/quangnd/ultimate-poc/issues/41), PR [#42](https://github.com/quangnd/ultimate-poc/pull/42), merge `7c289f1`.
+Coordinator #11372; builder #11470; blind QA #11457; reviewer #11660. The brief did not restate the coordination rules: the coordinator followed
+its overlay (#7), `.ultimate/skills/blind-qa` (#6) and the waiting rules (#14).
+
+**Measurement.** `tools/metrics/conversation-metrics.js`. Scope: coordinator #11372 only, n = 1, so this is an observation, not a trend.
+Cutoff: 2026-11-02T10:19Z (newest counted assistant entry 11797, after the PR merge and before the closeout and the final report).
+Context per call = input + cacheRead + cacheWrite of each stored assistant entry.
+
+**Infrastructure failure, excluded.** The first model call (entry 11407) failed with a Claude Code upstream error, with 0 tokens.
+It was recovered by a manual resume from #52. It is excluded from the call count and the context numbers.
+
+| Metric | EXP-03 baseline | This run |
+|---|---|---|
+| Coordinator tokens | 2.64M | 1.30M (1,264,905 claude-opus-5-5 turns + 33,924 github-copilot summary calls by Ultimate) |
+| Median context | 72.6k | 64.8k |
+| Max context | n/a | 71.8k (min 26.6k) |
+| Model calls | 30 | 22 (23 entries, minus the failed 11407) |
+| Review rounds | n/a | 1 (APPROVED, no findings) |
+| Defects that reached main | 0 | 0 |
+| QA base SHA recorded before the builder's commit | n/a | yes: `22fd3eb` recorded 10:11:01Z; builder commit `5263788` at 10:13:54Z |
+| Waited without codemode polling | n/a | yes: the coordinator ended its turn and was woken by each child's answer. The only wait was one interruptible 25 s bash `sleep` before `gh pr checks` (the repo has no GitHub checks) |
+
+Verification: builder E2E 7/7, typecheck 0, both mutations exit 1. Blind QA (own spec from the AC, started detached at the base): 8/8 with
+its spec, and both mutations (notice hidden, Retry no-op) fail both specs. The coordinator ran the tests once on the PR tip: typecheck 0, unit 0, E2E 7 passed.
+
+Confound: #41 is a test-only, single-file issue, smaller than the EXP-03 issue. Some of the drop in tokens and calls comes from task size, not only from the overlay.
+
+| Proposal | Outcome | Basis |
+|---|---|---|
+| #7 lean coordinator overlay | VALIDATED (n = 1, confounded by task size) | tokens −51 %, median context −11 %, calls 30 → 22, one review round, 0 defects on main |
+| #6 blind-QA skill | VALIDATED | base SHA recorded and given to both briefs before the builder committed; QA briefed from the AC alone; mutation-checked both guards; it found extra coverage (500 path, retry while still broken) without a gap a mutation passes |
+| #14 wait/context rules | VALIDATED | no codemode polling loop; every wait ended the turn; max context 71.8k with no compaction; child reports stayed at or below ~1.5k characters |
