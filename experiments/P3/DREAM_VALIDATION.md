@@ -108,4 +108,6 @@ Fast enough for the setup's two-minute limit, so `isolates.worktree.setup` was a
 Remaining risk: a cold-cache install dropped one optional package once (see above), so a setup that "succeeds" can still leave a broken
 `node_modules`; it showed as `Cannot find package "@esbuild/darwin-arm64"`.
 
+Blind QA #10293 independently passed AC1-4, 6 and 7 (concurrent 5611/5711 and 5612/5712 both 6 passed; defaults collided with `Port 5273 is already in use`); the hung-holder case it found (a holder on the web port that accepts but never replies hung `webServer.url` for over 120 s) is fixed by `webServer.port`: with such a holder on 5621, `WEB_PORT=5621 API_PORT=5721 npm run test:e2e` exits 1 in 1.6 s with `http://localhost:5621 is already used`.
+
 Outcome: VALIDATED (6 of 6 counted concurrent "after" runs passed; the first attempt is excluded as an infrastructure fault, see above)

@@ -33,7 +33,8 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `npm run dev -- --port ${WEB_PORT}`,
-    url: `http://127.0.0.1:${WEB_PORT}`,
+    // `port`, not `url`: a holder that accepts connections but never replies would make a `url` check wait for minutes.
+    port: WEB_PORT,
     env: { API_PORT: String(API_PORT) },
     reuseExistingServer: false,
   },

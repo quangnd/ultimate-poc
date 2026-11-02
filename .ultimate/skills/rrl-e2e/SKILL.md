@@ -12,10 +12,10 @@ The E2E run starts a web server and an API on two fixed ports, and two runs on o
 - **In a worktree, take your own pair**, so a run never meets another one:
 
   ```bash
-  eval "$(node -e 'const n=require("node:net"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>r(p))})});Promise.all([f(),f()]).then(([w,a])=>console.log(`export WEB_PORT=${w} API_PORT=${a}`))')"
-  npm run test:e2e
+  ( eval "$(node -e 'const n=require("node:net"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>r(p))})});Promise.all([f(),f()]).then(([w,a])=>console.log(`export WEB_PORT=${w} API_PORT=${a}`))')"; npm run test:e2e )
   ```
 
+  The subshell keeps the variables out of your shell, where they would point a later `npm run dev` at the wrong API.
   Or choose them by hand: `WEB_PORT=5373 API_PORT=5374 npm run test:e2e`. Both must be integers and differ.
 - **`EADDRINUSE` or "port already in use"** means another run holds one of the pair. Run again with another pair; do not
   hunt with `lsof` and wait. A pair you chose yourself that fails the same way is held by something else, so pick again.
