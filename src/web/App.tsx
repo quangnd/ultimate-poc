@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import sampleText from '../../fixtures/release.json?raw'
 import { DashboardView } from './Dashboard'
 import { changesOf, draftFrom, type Draft } from './draft'
 import { Editor } from './Editor'
 import { loadRelease, type LoadState, type ProblemItem } from './load'
+import { checkImport, importRelease, MAX_IMPORT_BYTES, summarize } from './transfer'
+import { ImportPanel, type ImportState } from './ImportPanel'
 
 type View = 'dashboard' | 'edit'
 const viewFromHash = (): View => (window.location.hash === '#edit' ? 'edit' : 'dashboard')
@@ -32,7 +35,34 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const dirty = state.kind === 'ready' && draft !== undefined && changesOf(state.dashboard.doc, draft).any
+  const changes = state.kind === 'ready' && draft !== undefined ? changesOf(state.dashboard.doc, draft) : undefined
+  const dirty = changes?.any ?? false
+  // Reordering alone is a change too (see changesOf), so a dirty draft always counts at least one.
+  const unsavedChanges = changes ? Math.max(changes.edited.size + changes.added.size + changes.deleted.length, dirty ? 1 : 0) : 0
+
+  // Import: choose a file, check it here, show what it holds, and only store it once the operator confirms.
+  const [importing, setImporting] = useState<ImportState>({ kind: 'idle' })
+  const fileInput = useRef<HTMLInputElement>(null)
+  const chooseFile = () => fileInput.current?.click()
+  const onFile = async (file: File | undefined) => {
+    if (!fileInput.current || !file) return
+    fileInput.current.value = '' // choosing the same file again must fire change again
+    // The size is checked before reading, so a huge file is never loaded into memory.
+    const check = file.size > MAX_IMPORT_BYTES ? checkImport('', file.size) : checkImport(await file.text(), file.size)
+    setImporting({ kind: 'checked', name: file.name, check })
+  }
+  const store = async (name: string, text: string) => {
+    const check = checkImport(text)
+    if (check.kind !== 'ready') return setImporting({ kind: 'checked', name, check })
+    setImporting({ kind: 'importing', name, check })
+    const outcome = await importRelease(check.text)
+    if (outcome.kind !== 'imported') return setImporting({ kind: 'refused', name, outcome })
+    await reload() // replaces the draft too: the operator confirmed discarding it
+    setImporting({ kind: 'imported', name, summary: check.summary })
+  }
+  const confirmImport = () => {
+    if (importing.kind === 'checked' && importing.check.kind === 'ready') void store(importing.name, importing.check.text)
+  }
   useEffect(() => {
     if (!dirty) return
     const warn = (e: BeforeUnloadEvent) => e.preventDefault()
@@ -55,8 +85,40 @@ export function App() {
         {state.kind === 'ready' && (
           <span className="masthead-meta">Synthetic data · computed in your browser from the stored release</span>
         )}
+        {(state.kind === 'ready' || state.kind === 'invalid') && (
+          <span className="masthead-actions">
+            <button type="button" className="quiet" onClick={chooseFile}>Import…</button>
+            {state.kind === 'ready' && (
+              <a
+                className="button quiet"
+                href="/api/export"
+                download="release.json"
+                title={dirty ? 'Downloads the stored release; your unsaved edits are not included' : 'Downloads the stored release as release.json'}
+              >
+                Export
+              </a>
+            )}
+          </span>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={(e) => void onFile(e.target.files?.[0])}
+        />
       </header>
       <main>
+        {importing.kind !== 'idle' && (
+          <ImportPanel
+            state={importing}
+            stored={state.kind === 'ready' ? summarize(state.dashboard.doc) : state.kind === 'invalid' ? 'unusable' : undefined}
+            unsavedChanges={unsavedChanges}
+            onConfirm={confirmImport}
+            onChooseAnother={chooseFile}
+            onClose={() => setImporting({ kind: 'idle' })}
+          />
+        )}
         {state.kind === 'loading' && <p className="muted" role="status">Loading release…</p>}
         {state.kind === 'ready' && view === 'dashboard' && (
           <>
@@ -85,10 +147,24 @@ export function App() {
         )}
         {state.kind === 'empty' && (
           <Notice title="No release yet" tone="neutral">
-            <p>There is no stored release to assess. Import one to see readiness and the forecast.</p>
-            <p>From the project folder, with the API running (<code>npm run server</code>):</p>
+            <p>There is no stored release to assess. Start from the bundled sample, or import a release file, to see readiness and the forecast.</p>
+            <div className="import-actions">
+              <button
+                type="button"
+                className="primary"
+                disabled={importing.kind === 'importing'}
+                onClick={() => void store('the sample release', sampleText)}
+              >
+                {importing.kind === 'importing' ? 'Loading…' : 'Load the sample release'}
+              </button>
+              <button type="button" onClick={chooseFile}>Import a file…</button>
+            </div>
+            <p className="muted">
+              The sample is <code>fixtures/release.json</code>: Aurora Kiosk 2.0, 24 synthetic tasks in 5 streams. You can also
+              import from the project folder:
+            </p>
             <pre>{IMPORT_COMMAND}</pre>
-            <button type="button" onClick={() => void reload()}>Check again</button>
+            <button type="button" className="link" onClick={() => void reload()}>Check again</button>
           </Notice>
         )}
         {state.kind === 'invalid' && <InvalidNotice source={state.source} errors={state.errors} onRetry={reload} />}

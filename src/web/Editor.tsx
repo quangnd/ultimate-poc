@@ -408,7 +408,7 @@ function Banner({
 }
 
 /** A cycle reads as a path of ids; every other error is the validator's own message. */
-function ProblemText({ error, inRow }: { error: ValidationError; inRow?: boolean }) {
+export function ProblemText({ error, inRow }: { error: ValidationError; inRow?: boolean }) {
   if (!error.cycle) return <span className="problem-message">{error.message}</span>
   const path = [...error.cycle, error.cycle[0]!]
   return (
