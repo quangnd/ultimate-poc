@@ -12,7 +12,7 @@ Markers: (M) measured here, (D) derived/inferred.
 | host core, pid 72533 | `node /Users/mun/Projects/ultimate/server/main.ts` | supervisor `fork()` (`bin/ultimate.ts:283`) |
 
 - There is no launchd plist for Ultimate (`~/Library/LaunchAgents` has only unrelated agents) and no project or user setting that injects env into the host. `~/.ultimate/settings.json` and `.ultimate/settings.json` have no env keys.
-- The core gets `{...process.env}` of the supervisor (`bin/ultimate.ts:285-286`). `fork()` also passes the supervisor's `process.execArgv` by default. Shown with a two-process script: a parent started with `node --network-family-autoselection-attempt-timeout=2000` forks a child that reports `execArgv` with the flag and `getDefaultAutoSelectFamilyAttemptTimeout()=2000`; without the flag the child reports 500.
+- The core gets `{...process.env}` of the supervisor (`bin/ultimate.ts:285-286`). `fork()` also passes the supervisor's `process.execArgv` by default. Shown with `experiments/P4/fork-inherit.mjs`: `node --network-family-autoselection-attempt-timeout=2000 experiments/P4/fork-inherit.mjs` prints `child execArgv=[--network-family-autoselection-attempt-timeout=2000] attemptTimeout=2000 NODE_OPTIONS=<unset>`. Without the flag it prints `execArgv=[] attemptTimeout=500`.
 - The relay that fails (`TurnRelay`, `pi-claude-code/src/claude-cli.ts:813`, `turn-relay.ts:287`) runs **inside the host core process**. The `claude` CLI (a Mach-O binary, 2.1.292) talks only to that local relay, so the host core is the only process that needs the flag.
 - Neither process carries `NODE_OPTIONS` today (`ps eww` grep, values not printed).
 - **Consequence (D):** the `restart` tool (core swap) re-forks from the running supervisor, which does not have the flag. Applying it needs a **manual relaunch of the supervisor** in its terminal. That is the only way short of changing Ultimate core (`bin/`) or the user's shell profile, and both are out of scope.
@@ -35,11 +35,16 @@ Reading (D): the network was calm in this window (IPv4 connects ~300 ms, below 5
 
 | Measure | Value |
 |---|---|
-| Claude Code assistant calls (`provider = claude-code`) | 1035 |
+| Claude Code assistant calls (`provider = claude-code`) | 1036 |
 | of which `stopReason=error` with `relay failure AggregateError` | **25** (2.4 % of calls, 1.04/h) |
-| busiest hour | 2026-11-02 13Z: 10 |
+| busiest hour | 2026-11-02 13Z: 10 of 274 calls |
 
-Per hour (UTC, 2026-11-02): 00:2, 04:1, 06:1, 09:1, 10:1, 12:2, 13:10, 16:3, 17:4; other hours 0. The cross-check `ultimate.search('relay failure AggregateError')` gives the same 25 distinct (conversation, timestamp) errors in the window, and 30 since the first on 2026-11-01 15:28Z. Confound (D): the rate depends on how many fresh Claude Code connections are opened, so the re-count compares the **share of calls**, not the raw count.
+Measurement cutoff: first query at 2026-11-02 ~18:14:55Z returned 1035 calls. This branch made one more Claude Code call at 18:14:57Z, still inside the window, so a re-run after 18:15Z returns 1036 / 25 (found by the reviewer). 1036 is the final figure; the share is unchanged at 2.4 %.
+
+Hours with relay errors (UTC, 2026-11-02; calls / errors): 00Z 148/2, 04Z 67/1, 06Z 61/1, 09Z 89/1, 10Z 58/1, 12Z 29/2, 13Z 274/10, 16Z 15/3, 17Z 138/4. Every other hour had 0 errors. Reproduce: in the section 6 command, replace the final `select … from m where …;` with
+`select strftime('%Y-%m-%dT%HZ', ts/1000, 'unixepoch') hour, count(*) calls, sum(em like '%relay failure AggregateError%') relay_err from m where <same window> group by hour having relay_err > 0;`
+
+The cross-check (codemode: `ultimate.search('relay failure AggregateError', {limit: 1000})`, keeping `pi.assistant` entries whose `model[]` message has `stopReason: 'error'` and that text, de-duplicated by conversation and timestamp) gives the same 25 distinct (conversation, timestamp) errors in the window, and 30 since the first on 2026-11-01 15:28Z. Confound (D): the rate depends on how many fresh Claude Code connections are opened, so the re-count compares the **share of calls**, not the raw count.
 
 ## 3. Apply
 
@@ -110,9 +115,9 @@ select count(*) calls, sum(em like '%relay failure AggregateError%') relay_err
 from m where ts >= strftime('%s','2026-11-02T23:42:52')*1000 and ts < strftime('%s','2026-11-03T23:42:52')*1000;"
 ```
 
-Baseline query: the same command with `2026-11-01T18:15:00` / `2026-11-02T18:15:00`, giving 1035 calls / 25 errors.
+Baseline query: the same command with `2026-11-01T18:15:00` / `2026-11-02T18:15:00`, giving 1036 calls / 25 errors.
 
-**Judgement rule (set before the data):** compare the error **share of calls** against 2.4 % (25/1035).
+**Judgement rule (set before the data):** compare the error **share of calls** against 2.4 % (25/1036).
 - 0 errors over at least 300 calls: **effective**; outcome PASS.
 - Fewer than 300 calls: inconclusive; extend the window.
 - Any `relay failure AggregateError` under the flag: **not effective**; keep the inner error codes for diagnosis. A timeout above 2 s points at the network, not happy-eyeballs; then consider option 2 or 3 of `FAILURES.md`.
