@@ -1,0 +1,120 @@
+{
+  "capturedAt": "2026-11-02T04:09:52.280Z",
+  "command": "gh issue list -R quangnd/ultimate-poc --state all --limit 100 --json number,state,title,labels",
+  "issues": [
+    {
+      "number": 2,
+      "state": "CLOSED",
+      "title": "P0: Environment, capability verification and baseline",
+      "labels": [
+        "phase:P0"
+      ]
+    },
+    {
+      "number": 5,
+      "state": "CLOSED",
+      "title": "P1-1: Project scaffold, domain types and lander checks",
+      "labels": [
+        "phase:P1"
+      ]
+    },
+    {
+      "number": 6,
+      "state": "CLOSED",
+      "title": "P1-2: Document validation (IDs, estimates, unknown predecessors, cycles, gates)",
+      "labels": [
+        "phase:P1"
+      ]
+    },
+    {
+      "number": 7,
+      "state": "CLOSED",
+      "title": "P1-3: Deterministic working-day scheduler",
+      "labels": [
+        "phase:P1"
+      ]
+    },
+    {
+      "number": 8,
+      "state": "CLOSED",
+      "title": "P1-4: Blocking, driving chain and readiness",
+      "labels": [
+        "phase:P1"
+      ]
+    },
+    {
+      "number": 9,
+      "state": "CLOSED",
+      "title": "P1-5: Synthetic fixture and firmware-delay scenario",
+      "labels": [
+        "phase:P1"
+      ]
+    },
+    {
+      "number": 18,
+      "state": "CLOSED",
+      "title": "P2-1: JSON store with atomic writes and loopback API",
+      "labels": []
+    },
+    {
+      "number": 19,
+      "state": "CLOSED",
+      "title": "P2-2: Dashboard: readiness, forecast vs target, blockers, assumptions",
+      "labels": []
+    },
+    {
+      "number": 20,
+      "state": "CLOSED",
+      "title": "P2-3: Editor for tasks, dependencies and gates",
+      "labels": []
+    },
+    {
+      "number": 21,
+      "state": "CLOSED",
+      "title": "P2-4: Import and export in the UI",
+      "labels": []
+    },
+    {
+      "number": 22,
+      "state": "CLOSED",
+      "title": "P2-5: Playwright E2E, restart persistence, lander and README",
+      "labels": []
+    },
+    {
+      "number": 30,
+      "state": "OPEN",
+      "title": "P3-A: Coordinator token breakdown, failure ledger, overhead reduction, CI and UI-concurrency notes",
+      "labels": [
+        "experiment",
+        "phase:P3"
+      ]
+    },
+    {
+      "number": 31,
+      "state": "OPEN",
+      "title": "P3-B: EXP-05 read-only metrics panel (Ultimate project extension)",
+      "labels": [
+        "experiment",
+        "phase:P3"
+      ]
+    },
+    {
+      "number": 32,
+      "state": "OPEN",
+      "title": "P3-C: EXP-02/03/04: lean-coordinator delegation, durability restart, plan tracking",
+      "labels": [
+        "experiment",
+        "phase:P3"
+      ]
+    },
+    {
+      "number": 33,
+      "state": "OPEN",
+      "title": "P3-D: EXP-06 self-improvement and EXP-01 context recovery and Dream value",
+      "labels": [
+        "experiment",
+        "phase:P3"
+      ]
+    }
+  ]
+}
