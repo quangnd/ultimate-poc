@@ -167,7 +167,7 @@ After the cutoff, one more incident occurred: #15503/16176 and 16182, 17:31:36. 
 - **Watchdog retry:** it ran in 14 incidents and its retry failed again, in the same burst, in 5: #1510 twice, #12079, #52/13452, and #13171 right after F24's Play.
 - **First calls:** all 6 failures on a branch's first call needed #52, because the watchdog skips reply-expecting inputs (`extensions/watchdog/README.md:3`). These are #6558, #11372, #12097, #12079, #12469 and #13171.
 - **Wall time lost:**
-  - non-429 incidents: 26.7 min in total across 24 incidents (median 0.9 min);
+  - non-429 incidents: 26.7 min in total across 24 incidents (median 1.0 min);
   - 429 pauses: 15.2 h of waiting for a human. These dominate.
 - **Duplicate effects:** none found.
   - Each resumed run checked state first (the watchdog's prompt says "check what you already did and do not redo it").
