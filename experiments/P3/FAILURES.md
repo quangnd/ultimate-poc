@@ -20,6 +20,10 @@ All times are UTC. "Idle gap" runs from the last successful call before the fail
 | F6 | #1510 | 5891, 00:39:04 | upstream, status unknown | browser | resume input (pi.user 5893, 00:40:06) | the run continued | 1.3 min | none |
 | F7 | #6558 (this analysis) | 7000, 04:10:24 | **429 rate limit** (claude-code account) | write (TOKEN_ANALYSIS.md draft) | no: run paused (`pause.limit`, #52 7001) | **Play** by the human (pause.note 7014, 06:41:20) | **2 h 31 min** | none: the file was intact and the edit continued |
 
+| F8 | #7486, #7509 (EXP-03, #32) | e2e runs ~06:5x–07:0x | Playwright `webServer` port 5273/5274 already in use / `EADDRINUSE` (concurrent `npm run test:e2e` from two worktrees, fixed ports) | bash (e2e) | no | each worker re-ran serially after checking `lsof`; all later runs green | minutes | none: no test executed, no write |
+
+F8 is a local test-infrastructure collision, not a provider error. It is listed here because it is infrastructure, not an agent defect.
+
 F7 is the same account-wide claude-code 429 window that paused the EXP-05 coordinator #6576 (about 04:10–06:35 UTC, recorded in `experiments/EXP-05/RUN-20261102-01.md`, PR #34). It counts as one infrastructure event that hit two conversations.
 
 ## Root #52
