@@ -1,11 +1,11 @@
 {
   "updated": "2026-11-02",
-  "note": "Hand-maintained summary of committed evidence; each figure names its source. Read by .ultimate/extensions/poc-status.",
+  "note": "Hand-maintained summary of committed evidence; each figure names its source. Issue counts come from the dated snapshot experiments/EXP-05/issues-20261102.json (gh issue list, 2026-11-02T04:09Z). Read by .ultimate/extensions/poc-status.",
   "issues": [
-    { "phase": "P0", "open": 0, "closed": 1, "source": "GitHub #2 (state/PROJECT_STATUS.md)" },
-    { "phase": "P1", "open": 0, "closed": 5, "source": "#5–#9, experiments/P1/LOG.md" },
-    { "phase": "P2", "open": 0, "closed": 5, "source": "#18–#22, experiments/P2/LOG.md" },
-    { "phase": "P3", "open": 4, "closed": 0, "source": "#30–#33 (GitHub, 2026-11-02)" }
+    { "phase": "P0", "open": 0, "closed": 1, "source": "#2 (label phase:P0), experiments/EXP-05/issues-20261102.json" },
+    { "phase": "P1", "open": 0, "closed": 5, "source": "#5–#9 (label phase:P1), experiments/EXP-05/issues-20261102.json" },
+    { "phase": "P2", "open": 0, "closed": 5, "source": "#18–#22 (unlabelled; title P2-n), experiments/EXP-05/issues-20261102.json" },
+    { "phase": "P3", "open": 4, "closed": 0, "source": "#30–#33 (label phase:P3), experiments/EXP-05/issues-20261102.json" }
   ],
   "tests": [
     { "label": "P1 end", "value": "587 unit", "source": "experiments/P1/LOG.md § Tests" },

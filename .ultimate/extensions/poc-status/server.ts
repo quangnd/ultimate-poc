@@ -39,6 +39,36 @@ async function defects(root: string) {
   return logs
 }
 
+type Row = Record<string, string | number>
+
+/** The `key` array of `value` when every row has the given field types; otherwise an error naming the key. */
+function rows(value: Record<string, unknown>, key: string, fields: Record<string, 'string' | 'number'>) {
+  const list = value[key]
+  if (list === undefined) return undefined
+  const valid =
+    Array.isArray(list) &&
+    list.every(
+      (row) =>
+        row !== null &&
+        typeof row === 'object' &&
+        Object.entries(fields).every(([field, type]) => typeof (row as Row)[field] === type),
+    )
+  if (!valid) throw new Error(`"${key}" must be a list of { ${Object.keys(fields).join(', ')} }`)
+  return (list as Row[]).map((row) => Object.fromEntries(Object.keys(fields).map((field) => [field, row[field]])))
+}
+
+/** The summary file's issues, tests and tokens, checked so the panel never renders a malformed shape. */
+function checked(value: unknown) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('expected an object')
+  const summary = value as Record<string, unknown>
+  return {
+    updated: typeof summary.updated === 'string' ? summary.updated : null,
+    issues: rows(summary, 'issues', { phase: 'string', open: 'number', closed: 'number', source: 'string' }) ?? null,
+    tests: rows(summary, 'tests', { label: 'string', value: 'string', source: 'string' }) ?? null,
+    tokens: rows(summary, 'tokens', { phase: 'string', tokens: 'string', cost: 'string', source: 'string' }) ?? null,
+  }
+}
+
 export const actions = {
   /** No arguments → `{ phase, updated, defects, summary }`; reads files only, never writes or calls the network. */
   async status(_args: JsonValue, ctx: ActionContext) {
@@ -54,7 +84,7 @@ export const actions = {
     if (raw === undefined) summaryError = `${SUMMARY} is missing`
     else {
       try {
-        summary = JSON.parse(raw) as JsonValue
+        summary = checked(JSON.parse(raw)) as JsonValue
       } catch (error) {
         summaryError = `${SUMMARY}: ${(error as Error).message}`
       }

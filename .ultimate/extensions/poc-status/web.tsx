@@ -11,7 +11,12 @@ type Status = {
   phase: string | null
   updated: string | null
   defects: { log: string; total: number; severities: Record<string, number> }[]
-  summary: { updated?: string; issues?: Phase[]; tests?: Line[]; tokens?: Tokens[] } | null
+  summary: {
+    updated: string | null
+    issues: Phase[] | null
+    tests: Line[] | null
+    tokens: Tokens[] | null
+  } | null
   summaryError: string | null
 }
 
