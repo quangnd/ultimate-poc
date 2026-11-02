@@ -32,6 +32,10 @@ Public repo: only synthetic release data. Never commit secrets, tokens, company 
 ## Quality bar
 Functional correctness precedes agent cleverness. Keep changes minimal. Every issue has observable AC and a reproducible verification. Document unsupported features as NOT AVAILABLE, not FAIL. Distinguish infrastructure errors from agent errors. Use consistent experiment IDs.
 
+## Shell and integration
+- This Mac has no `rg` and no GNU `timeout`: search with `grep -rn`/`find`, bound commands with the bash tool's `timeout` parameter, and keep compound commands short and bounded.
+- Run `git push`, `gh pr create` and `gh pr merge` as separate bash calls, each with a timeout. Before any retry, and after an outage, check the state first (`gh pr view <n> --json state,mergeCommit`, `git status`, `git log origin/main -1`) and resume from it; never repeat a completed step.
+
 ## Autonomous execution policy (human-on-the-loop)
 The operator acts as Product Owner and supervisor, not task dispatcher. After the human approves a phase goal and its guardrails, coordinator may autonomously break work into issues, delegate, implement, run tests, review, fix ordinary failures, update issues and checkpoints, and submit PRs. Routine actions inside approved scope do not require repeated permission. Coordinator should choose sequential versus parallel agents based on benefit and conflict risk.
 
