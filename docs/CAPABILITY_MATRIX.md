@@ -36,6 +36,17 @@ before its experiment runs with the evidence standard of docs/EVALUATION.md.
 | Self-modifying workflow | PARTIAL | EXP-06 pass condition met (rule with scope/evidence, no unapproved change); Dream → 13 PO-approved changes, 6 VALIDATED (DREAM_VALIDATION.md, P3/GATE_SUMMARY.md) | EXP-06 showed no transfer of a memory rule to workers |
 | Auditability | **PASS** | `ultimate.trace`, `pi.usage`, `ultimate.search` reproduced every metric and the failure re-count (FAILURES.md) | Trace keeps the newest 1000 rows / ~7 days; USD is a list-price proxy |
 
+## P4 results (2026-11-02/03, coordinator #52; see experiments/P4/SCORECARD.md, reconciled 3.35/5, selectively reuse)
+
+| Capability | P4 status | Evidence | Limitation |
+|---|---|---|---|
+| Durable execution | **PASS** | FAULT_INJECTION.md: the lander resumed a submission interrupted by a host restart, landed once, no duplicates; 29/29 provider incidents recovered with no lost or duplicated effects | A restart with E2E in flight orphaned Vite (2/2), blocking a landing until a manual kill |
+| Subagents / delegation | **PASS** (cost caveat) | EXP-07/EXP-08: all arms 34/34 hidden first pass; the reviewer caught the only defect | Orchestration cost 3.6× a single worker with no gain on a small task (EXP-07, n=1) |
+| Project context/memory | **FAIL** (memory alone) | EXP-09 blind: memory-only 5/10 (<90%), all misses true gaps, no fabrication; memory+docs 10/10 | The memory tool has no search; workers get no memory index |
+| Custom surfaces / extensions | **PASS, adopted** | PR #34 merged (c930bb6); `ultimate.extensions()` shows poc-status loaded with no errors (SCORECARD.md's "not adopted" predates this) | Issue counts come from a manual snapshot |
+| Auditability | **PASS** | FAILURES.md: 36 failed calls / 29 incidents re-counted via `ultimate.search`; relay error root-caused | Trace window limited (~7 days, 1000 rows) |
+| CI corroboration | **PASS** | GitHub Actions on PR #50 and main: green in ~50 s, agrees with the lander's checks on the same commit | n/a |
+
 Allowed status: UNVERIFIED, PASS, PARTIAL, FAIL, NOT AVAILABLE. Record version, limitation and direct proof. Distinguish framework advertised behavior from POC implementation.
 
 Limitations of the P0 smoke column: it was made by Ultimate agents observing Ultimate (self-assessment); the
