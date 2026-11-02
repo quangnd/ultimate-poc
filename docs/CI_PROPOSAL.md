@@ -1,6 +1,6 @@
-# CI proposal: minimal GitHub Actions workflow (proposal only, not enabled)
+# CI proposal: minimal GitHub Actions workflow (enabled in P4, issue #45)
 
-This is a proposal only, for issue #30 (PO priority 5). Nothing is committed under `.github/`.
+Written as a proposal for issue #30 (PO priority 5). The PO approved it at the P3 gate (2026-11-02), and it was enabled in P4 by PR #50: see [Enabled](#enabled) at the end.
 
 ## Workflow (text)
 
@@ -77,3 +77,25 @@ Public repositories get free Actions minutes on standard runners, so there are n
 - Adding CI during P3 would change the environment the P3 experiments (EXP-01..06) measure, and would add one more signal to compare in the middle of an experiment.
 
 Enable it at the P3 → P4 gate as one small PR with the workflow above. Its first run on main becomes the baseline. If the PO wants independent corroboration sooner, enable it without the two Playwright steps (< 1.5 min); that does not touch the experiment flow.
+
+## Enabled
+
+Enabled on 2026-11-02 by PR #50 (issue #45). The merge commit is `1bdd8b3`. `.github/workflows/ci.yml` is the workflow above, unchanged except for one comment line.
+
+- **Node 26:** available to `actions/setup-node` (`actions/node-versions` manifest, newest 26.13.0), so `node-version: 26` is kept.
+- **E2E ports:** the runner sets no `WEB_PORT`/`API_PORT`, so `playwright.config.ts` uses its defaults 5273/5274. They are free on a fresh runner.
+
+| Run (ubuntu-latest) | Commit | Result | Job time | Wall time (queued → done) |
+|---|---|---|---|---|
+| PR #50, run 41449421136 | `c01edff` | success | 49 s | 52 s |
+| **main baseline**, push, run 41449585598 | `1bdd8b3` | success | **51 s** | 54 s |
+
+Steps of the main run: setup-node 5 s, `npm ci` 2 s, typecheck 1 s, `npm test` 3 s, Playwright Chromium install with deps 20 s, `npm run test:e2e` 16 s.
+
+The actual time is about 1 min, under the 2–4 min estimate. The Chromium install took 20 s, against the 60–120 s estimate.
+
+**Agreement with the lander's checks on `1bdd8b3`:** both are green.
+
+- The lander's four check commands (`.ultimate/settings.json`) were run once by the coordinator in the #45 worktree at `1bdd8b3`. `npm ci`, typecheck and E2E passed (7 passed, own port pair); a separate `npx vitest run` reported 775/775 tests.
+- The lander then ran the same checks on the #45 closeout tip, which differs from `1bdd8b3` only in docs. Its result is on the landing card.
+- CI and the local checks run different operating systems (Linux vs macOS) and different Node patch versions.
