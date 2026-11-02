@@ -1,0 +1,9 @@
+# Provenance of hidden suites and coordinator references (file mtimes, local time UTC+7; arms started 13:17:25 UTC = 20:17:25 local)
+2026-11-02T20:15:54+0700 hidden/task1.hidden.test.ts
+2026-11-02T20:16:31+0700 hidden/task2.hidden.test.ts
+2026-11-02T20:15:54+0700 hidden/task3.hidden.test.ts
+2026-11-02T20:16:18+0700 ref/src/domain/links.ts
+2026-11-02T20:16:18+0700 ref/src/domain/gates.ts
+2026-11-02T20:16:18+0700 ref/src/domain/streams.ts
+
+# First Pi arm launch (task 1), UTC: 2026-11-02T13:17:31Z (t0, after clone and npm ci)

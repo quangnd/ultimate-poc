@@ -8,7 +8,9 @@ Issues #48 (EXP-08) and #47 (EXP-07). Run 2026-11-02, 13:17–13:43 UTC, by coor
 - 3 matched domain-level tasks (`task-N/TASK.md`), each a new pure module in `src/domain/` with unit tests, inside
   PRD US-03/05/06 and ADR-002, no new scope: link add/remove, gate status summary, per-stream summary.
 - Hidden suites (12/11/11 cases) written before any arm, checked against a coordinator reference (34/34) and without
-  one (all 3 files fail), kept outside every arm's tree, committed only now.
+  one (all 3 files fail), kept outside every arm's tree, committed only now. The references are in `reference/`;
+  `provenance.txt` has the file times (last edit 13:16:31 UTC, first arm launch 13:17:31 UTC). The 34/34 run itself
+  was not saved; it is reproducible by copying `reference/*.ts` to `src/domain/` and running the suites.
 - Same base `7385604`, same verbatim prompt, same grading script for every arm.
 - Order alternated: task 1 Pi first, task 2 Ultimate first, task 3 Pi first.
 - **Pi arm:** fresh clone, `pi -p --no-session --mode json --model anthropic/claude-opus-5-5:medium "<TASK>"`, then
@@ -21,23 +23,28 @@ Issues #48 (EXP-08) and #47 (EXP-07). Run 2026-11-02, 13:17–13:43 UTC, by coor
 
 | Task / arm | Wall min | Interv. | Hidden 1st / final | Defects (sev.) | typecheck / test | Model calls | Tokens | Cost proxy USD |
 |---|---|---|---|---|---|---|---|---|
-| 1 Pi | 3.1 | 0 | 12/12 / 12/12 | 0 | 0 / 0 | 17 | 477,653 | 0.59 |
+| 1 Pi | 3.0 | 0 | 12/12 / 12/12 | 0 | 0 / 0 | 17 | 477,653 | 0.59 |
 | 1 Ultimate | 5.6 | 0 | 12/12 / 12/12 | 0 | 0 / 0 | 29 | 1,240,925 | 0.88 |
 | 1 single worker (EXP-07) | 1.9 | 0 | 12/12 / 12/12 | 0 | 0 / 0 | 14 | 457,155 | 0.24 |
-| 2 Pi | 2.5 | 0 | 11/11 / 11/11 | 0 | 0 / 0 | 18 | 475,307 | 0.50 |
+| 2 Pi | 2.2 | 0 | 11/11 / 11/11 | 0 | 0 / 0 | 18 | 475,307 | 0.50 |
 | 2 Ultimate | 4.3 | 0 | 11/11 / 11/11 | 0 | 0 / 0 | 28 | 1,121,415 | 0.74 |
-| 3 Pi | 2.3 | 0 | 11/11 / 11/11 | 0 | 0 / 0 | 15 | 436,860 | 0.50 |
+| 3 Pi | 2.2 | 0 | 11/11 / 11/11 | 0 | 0 / 0 | 15 | 436,860 | 0.50 |
 | 3 Ultimate | 6.3 | 0 | 11/11 / 11/11 | 1 medium + 1 low in first commit, both fixed by its own review loop | 0 / 0 | 41 | 2,030,570 | 1.10 |
-| **Pi, 3 tasks** | **7.9** | 0 | 34/34 | 0 | all 0 | 50 | 1,389,820 | **1.59** |
+| **Pi, 3 tasks** | **7.4** | 0 | 34/34 | 0 | all 0 | 50 | 1,389,820 | **1.58** |
 | **Ultimate, 3 tasks** | **16.2** | 0 | 34/34 | 1 medium (fixed) | all 0 | 98 | 4,392,910 | **2.72** |
 
 Within the Ultimate arm, blind QA took 67–74 % of tokens and 63–71 % of the cost proxy in each task; builders
-alone took 1.3–2.5 min. Wall time per arm runs from first launch to the last report (QA phase 2), i.e. until the
-arm's own evidence is complete; Pi's includes clone and `npm ci`.
+alone took 1.3–2.5 min. Ultimate wall time runs from the coordinator's launch timestamp to the last report (QA phase
+2), i.e. until the arm's own evidence is complete, and includes worktree setup (`npm ci`). Pi wall time runs from the
+first `pi` launch to the end of the review pass (`t0`..`t2` in `task-N/pi-meta.txt`) and **excludes** clone and
+`npm ci`, which were not timed. Totals are sums of unrounded values. Per-conversation Ultimate numbers:
+`ultimate-metrics.json` (export with cutoff timestamp).
 
 **Coordinator share (excluded from the arms above):** #13171, all of EXP-07 and EXP-08 including task design,
-hidden suites, grading, cross-checks and these records up to this point: 77+ model calls, about 8.5M tokens (94 %
-cache reads), about $6.84 list-price proxy (Opus 5.5 via Claude Code). That is more than both arms together. It is
+hidden suites, grading, cross-checks and these records, up to the cutoff in `ultimate-metrics.json`
+(2026-11-02T13:53:19Z): 97 model calls, 12.8M tokens (95 % cache reads), $9.36 list-price proxy (Opus 5.5 via
+Claude Code, plus Sonnet usage the metrics attribute to subagent summaries). Work after the cutoff (review fixes,
+merge, closeout) is not counted. That is more than both arms together. It is
 experiment overhead; a normal issue coordinator does not write hidden suites or grade other arms, but it does
 launch, wait, read reports and route findings, which the Ultimate arm needs and the Pi arm does not.
 
@@ -53,7 +60,7 @@ repeated names, so both scored the defective commit as passing. Pi's code never 
 
 - On these three small, well-specified domain tasks, **every arm reached full hidden-suite acceptance on the first
   pass with zero interventions** and no regressions. Quality, as measured, was equal.
-- **Plain Pi was faster and cheaper here:** about 2.0× less wall time and 1.7× less cost proxy than the Ultimate
+- **Plain Pi was faster and cheaper here:** about 2.2× less wall time (Pi excluding setup) and 1.7× less cost proxy than the Ultimate
   flow across the three tasks (arm totals; coordinator excluded), with about half the model calls.
 - **EXP-07 (same model, unconfounded):** on task 1 the orchestrated flow cost about 3.6× the single worker's cost
   proxy, 2.1× its model calls and 2.9× its wall time, and found nothing the single worker had wrong. The single

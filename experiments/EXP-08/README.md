@@ -13,6 +13,9 @@ change under `src/`, `tests/`, `fixtures/` or `docs/decisions/`).
 | `task-N/pi-usage.txt`, `pi-meta.txt` | Pi token sums from `--mode json` `message_end` events, exit codes, SHAs, epoch timestamps |
 | `../EXP-07/single-worker.patch` | EXP-07 single worker, task 1 |
 | `grades.txt` | every grading run: hidden suite, `npm run typecheck`, `npm test` exit codes and counts, plus cross-QA runs |
+| `ultimate-metrics.json` | per-conversation export of `tools/metrics/conversation-metrics.js` (calls, tokens, cost proxy, times) for every Ultimate-arm child, reviewer and the coordinator, with its cutoff timestamp |
+| `reference/` | coordinator reference implementations used to check the hidden suites before any arm ran |
+| `provenance.txt` | file times of the hidden suites and references vs the first arm launch |
 | `tools/` | `run-pi.sh` (Pi arm driver), `grade.sh`, `crossqa.sh`, `piusage.mjs` |
 
 Reproduce a grade: `git apply task-N/<arm>.patch` on `7385604`, copy `task-N/hidden.test.ts` to `tests/hidden/`, run
