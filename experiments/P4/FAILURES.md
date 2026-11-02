@@ -12,11 +12,11 @@ This log continues `experiments/P3/FAILURES.md` and `experiments/P3/GATE_SUMMARY
 | F22 | #13171 (EXP-07/08, #47/#48) | 13891 (2026-11-02 about 13:24) | Claude Code upstream error (relay `AggregateError`) on the coordinator, after a grading step; automatic retry did not recover | manual resume by #52; state checked first (subagents listed, worktrees inspected) | none: no step repeated; it fell inside the task-1 Ultimate arm's window while QA ran, noted in EXP-08 RUN-20261102-01 |
 | F23 | #13171 (EXP-07/08, #47/#48) | 2026-11-02 about 13:50, while reviewer #15049's PR #55 answer arrived | Claude Code upstream error (relay `AggregateError`) on the coordinator | automatic resume; state checked first (`git status`, PR #55 state and CI) | none: no step repeated; after all arms finished, so no arm metric affected |
 | F24 | #13171 (EXP-07/08 closeout) | 2026-11-02 after PR #55 merged (`ef2ce9d`), during a `read` of the issue-closeout skill; then a 2 h 57 min claude-code 429 pause | Claude Code upstream error (relay `AggregateError`) after one automatic retry, followed by a rate-limit pause | manual resume by #52; state checked first (PR #55 MERGED, #47/#48 OPEN) | none: no step repeated; after all measurements |
-
 | F25 | #12079 (EXP-09 closeout, #46) | 13550 (2026-11-02 13:16:01) | Claude Code upstream error (relay `AggregateError`), missed by the first count | watchdog retry (13583) | none |
 | F26 | #52 (root) | 15291 (2026-11-02 16:57:20) | Claude Code upstream error (relay `AggregateError`), during the F24 recovery burst | watchdog retry (15318) | none |
 | F27 | #15503 (#49) | 15660 (2026-11-02 17:08:53), 4 s after the generation-3 host swap | Claude Code upstream error (relay `AggregateError`) | next input (#52's timing message) | none |
 | F28 | #15503 (#49) | 15774 (2026-11-02 17:14:41), 9 s after the generation-4 host swap | Claude Code upstream error (relay `AggregateError`) | next input (#52's timing message) | none |
+| F29 | #15503 (#49) | 16176 and 16182 (2026-11-02 17:31:36 and 17:32:37), during a `subagent` start of PR reviewer #16117 | Claude Code upstream error (relay `AggregateError`); the watchdog retry failed too | manual resume by #52; state checked first (`git status`, no PR existed yet, reviewer answer in the inbox) | none: no step repeated; reviewer #16117 had been started once |
 
 F25–F28 were added by #49 (`experiments/P4/FAULT_INJECTION.md` part B), which re-counted every `stopReason: error` entry up to 2026-11-02 17:16Z: 36 failed calls in 29 incidents.
 

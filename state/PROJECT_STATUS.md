@@ -33,6 +33,6 @@ Decisions pending (P4 gate, `experiments/P4/SCORECARD.md` "Open decisions"):
 - P2: experiments/P2/LOG.md (15 defects, all caught before merge; gate table; metrics), docs/screenshots/p2-*.png
 - P3: experiments/P3/{GATE_SUMMARY,TOKEN_ANALYSIS,FAILURES,DREAM_VALIDATION,UI_CONCURRENCY_LIMITS}.md, experiments/EXP-02..06, docs/CI_PROPOSAL.md, docs/CAPABILITY_MATRIX.md (P3 results)
 - P4: experiments/P4/{SCORECARD,FAULT_INJECTION,FAILURES}.md, docs/CI_PROPOSAL.md (Enabled), .github/workflows/ci.yml, experiments/EXP-09/RUN-20261102-01.md, experiments/EXP-07/RUN-20261102-01.md, experiments/EXP-08/{SUMMARY,RUN-20261102-01..03}.md
-- Infrastructure: failures F1–F28 are recorded (P3 FAILURES.md, GATE_SUMMARY.md F14–F16, P4 FAILURES.md F17–F28), incl. four claude-code 429 windows; all were recovered with no repeated effects.
+- Infrastructure: failures F1–F29 are recorded (P3 FAILURES.md, GATE_SUMMARY.md F14–F16, P4 FAILURES.md F17–F29), incl. four claude-code 429 windows; all were recovered with no repeated effects.
 
 Important: This file is a resume summary only. GitHub Issues and PRs are the task source of truth.

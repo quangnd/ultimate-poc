@@ -183,4 +183,4 @@ The thresholds are provisional (EVALUATION.md). The score sits mid-band, so a ±
 
 - `experiments/P2/LOG.md`: the severities sum to 16 for 15 defects. Not corrected here; it does not change any score.
 - `experiments/P4/FAILURES.md` F22 says the automatic retry failed. The entries show that the watchdog retry was followed by success one minute later (FAULT_INJECTION B). The row is kept as written and this note records the difference.
-- `state/PROJECT_STATUS.md` cited F1–F24 and three 429 pauses. This PR updates it to F1–F28 and four windows.
+- `state/PROJECT_STATUS.md` cited F1–F24 and three 429 pauses. This PR updates it to F1–F29 and four windows. F29 is a relay stop of this coordinator after the cutoff, and it is not in the totals.

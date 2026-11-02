@@ -104,9 +104,53 @@ Nothing was provoked. These are the real failures of P0–P4, so they are uncont
 - **29 incidents**: consecutive failed calls in one conversation, up to its next successful call, count as one. The shared 429 window F7+F12 counts as 2 incidents but as 1 window.
 - **Four failed calls missing from the F-ledger:** #12079/13550, #52/15291, #15503/15660 and #15503/15774. They are added to `FAILURES.md` as F25–F28.
 
-### Recovery
-| Recovery path | Incidents | Who acted | Wall time lost (sum; median) |
-|---|---|---|---|
+### Per-incident data (M)
+
+The data come from one codemode pass over the `pi.assistant` entries of each conversation that has a failure.
+- An incident runs from its first failed call to the conversation's next successful call.
+- "Recovery path" is the deliberate input that preceded that call:
+  - a `board.message` from #52 that resumes the conversation;
+  - the watchdog's `pi.user` "Your previous run stopped…";
+  - a `pause.note`, or the human's input after a 429;
+  - an input that arrived anyway;
+  - nothing.
+- Times are UTC on 2026-11-01/02, and "Lost" is the gap in minutes.
+
+| Conv. | Failed call entries | First failure | Error | Next success (entry, time) | Recovery path | Lost (min) |
+|---|---|---|---|---|---|---|
+| #1106 | 1267 | 11-01 13:00:56 | WebSocket error | 1268, 13:02:58 | automatic | 2.0 |
+| #2462 | 2798 | 11-01 14:15:27 | Connection error | 2799, 14:16:02 | automatic | 0.6 |
+| #2901 | 3066 | 11-01 14:23:52 | 408 timeout | 3067, 14:25:23 | automatic | 1.5 |
+| #1510 | 4577, 4583 | 11-01 15:28:10 | relay AggregateError | 4610, 15:29:30 | #52 resume (watchdog retry failed) | 1.3 |
+| #1510 | 4734, 4739, 4760 | 11-01 15:34:28 | relay AggregateError | 4767, 15:36:53 | #52 resume (watchdog retry failed) | 2.4 |
+| #1510 | 5056 | 11-01 16:03:38 | 429 | 5065, 00:10:33 | human (429) | 486.9 |
+| #5453 | 5705 | 11-02 00:33:07 | relay AggregateError | 5710, 00:34:09 | watchdog retry | 1.0 |
+| #1510 | 5891 | 11-02 00:39:04 | relay AggregateError | 5896, 00:40:06 | watchdog retry | 1.0 |
+| #6558 | 6629 | 11-02 04:03:04 | relay AggregateError | 6687, 04:03:28 | #52 resume (first call) | 0.4 |
+| #6558 | 7000 | 11-02 04:10:24 | 429 | 7011, 06:41:20 | human (429) | 150.9 |
+| #6576 | 7003 | 11-02 04:10:25 | 429 | 7006, 06:41:20 | human (429, same window) | 150.9 |
+| #52 | 7233 | 11-02 06:44:23 | relay AggregateError | 7301, 06:44:55 | ordinary input (child's message) | 0.5 |
+| #9990 | 10512 | 11-02 09:28:09 | relay AggregateError | 10570, 09:29:10 | watchdog retry | 1.0 |
+| #11372 | 11407 | 11-02 10:10:20 | relay AggregateError | 11432, 10:10:47 | #52 resume (first call) | 0.5 |
+| #52 | 11925 | 11-02 10:23:34 | 429 | 11930, 11:58:57 | human (429) | 95.4 |
+| #12097 | 12150 | 11-02 12:59:31 | relay AggregateError | 12194, 13:00:07 | #52 resume (first call) | 0.6 |
+| #12079 | 12151 | 11-02 12:59:31 | relay AggregateError | 12199, 13:00:07 | #52 resume (first call) | 0.6 |
+| #12469 | 12542 | 11-02 13:02:43 | relay AggregateError | 12607, 13:03:07 | #52 resume (first call) | 0.4 |
+| #52 | 12748 | 11-02 13:04:09 | relay AggregateError | 12832, 13:05:11 | watchdog retry | 1.0 |
+| #13171 | 13206 | 11-02 13:09:52 | relay AggregateError | 13233, 13:10:26 | #52 resume (first call) | 0.6 |
+| #12079 | 13341, 13351 | 11-02 13:11:58 | relay AggregateError | 13377, 13:13:36 | #52 resume (watchdog retry failed) | 1.6 |
+| #52 | 13370, 13452 | 11-02 13:13:36 | relay AggregateError | 13658, 13:17:46 | watchdog retry (its retry failed once; children's inputs followed) | 4.2 |
+| #12079 | 13550 | 11-02 13:16:01 | relay AggregateError | 13586, 13:17:02 | watchdog retry | 1.0 |
+| #13171 | 13891 | 11-02 13:23:26 | relay AggregateError | 13908, 13:24:27 | watchdog retry | 1.0 |
+| #13171 | 15114 | 11-02 13:51:30 | relay AggregateError | 15120, 13:52:31 | watchdog retry | 1.0 |
+| #13171 | 15257, 15261, 15269 | 11-02 13:58:01 | 429, then 2 relay errors after Play | 15293, 16:57:20 | human (429) | 179.3 |
+| #52 | 15291 | 11-02 16:57:20 | relay AggregateError | 15333, 16:58:23 | watchdog retry | 1.0 |
+| #15503 | 15660 | 11-02 17:08:53 | relay AggregateError | 15676, 17:09:47 | ordinary input (#52's timing reply) | 0.9 |
+| #15503 | 15774 | 11-02 17:14:41 | relay AggregateError | 15790, 17:15:02 | ordinary input (#52's timing reply) | 0.4 |
+
+After the cutoff, one more incident occurred: #15503/16176 and 16182, 17:31:36. It was a relay `AggregateError` during a `subagent` step. The watchdog retry failed, #52 resumed the conversation, and the next success was 16203 at 17:33:11 (1.6 min). It is F29 in `FAILURES.md` and is not included in the totals below.
+
+### Recovery (aggregated from the table above)
 | Recovery path | Incidents | Who acted | Wall time lost (sum; median) |
 |---|---|---|---|
 | Automatic, with no input at all (provider-level retry; non-claude-code providers) | 3 | nobody | 4.1 min; 1.5 min |
