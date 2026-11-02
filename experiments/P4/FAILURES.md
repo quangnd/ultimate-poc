@@ -10,6 +10,8 @@ This log continues `experiments/P3/FAILURES.md` and `experiments/P3/GATE_SUMMARY
 | F20 | #13171 (EXP-07/08, #47/#48) | 13206 (2026-11-02 13:09:52) | Claude Code upstream error on the branch's first model call. #52's resume note called it F19, but that ID was already taken, so it is F20 | manual resume by #52 | none: no work had started |
 | F21 | #52 (root) | 12748 (13:04:09), 13370 (13:13:36), 13452 (13:14:38) | Claude Code upstream error, 3 calls in the same burst | automatic retry / resume | none |
 | F22 | #13171 (EXP-07/08, #47/#48) | 13891 (2026-11-02 about 13:24) | Claude Code upstream error (relay `AggregateError`) on the coordinator, after a grading step; automatic retry did not recover | manual resume by #52; state checked first (subagents listed, worktrees inspected) | none: no step repeated; it fell inside the task-1 Ultimate arm's window while QA ran, noted in EXP-08 RUN-20261102-01 |
+| F23 | #13171 (EXP-07/08, #47/#48) | 2026-11-02 about 13:50, while reviewer #15049's PR #55 answer arrived | Claude Code upstream error (relay `AggregateError`) on the coordinator | automatic resume; state checked first (`git status`, PR #55 state and CI) | none: no step repeated; after all arms finished, so no arm metric affected |
+| F24 | #13171 (EXP-07/08 closeout) | 2026-11-02 after PR #55 merged (`ef2ce9d`), during a `read` of the issue-closeout skill; then a 2 h 57 min claude-code 429 pause | Claude Code upstream error (relay `AggregateError`) after one automatic retry, followed by a rate-limit pause | manual resume by #52; state checked first (PR #55 MERGED, #47/#48 OPEN) | none: no step repeated; after all measurements |
 
 All F1–F21 rows with the text `relay failure AggregateError:` share the root cause below.
 
