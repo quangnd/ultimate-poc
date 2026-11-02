@@ -1,0 +1,18 @@
+{
+  "updated": "2026-11-02",
+  "note": "Hand-maintained summary of committed evidence; each figure names its source. Read by .ultimate/extensions/poc-status.",
+  "issues": [
+    { "phase": "P0", "open": 0, "closed": 1, "source": "GitHub #2 (state/PROJECT_STATUS.md)" },
+    { "phase": "P1", "open": 0, "closed": 5, "source": "#5–#9, experiments/P1/LOG.md" },
+    { "phase": "P2", "open": 0, "closed": 5, "source": "#18–#22, experiments/P2/LOG.md" },
+    { "phase": "P3", "open": 4, "closed": 0, "source": "#30–#33 (GitHub, 2026-11-02)" }
+  ],
+  "tests": [
+    { "label": "P1 end", "value": "587 unit", "source": "experiments/P1/LOG.md § Tests" },
+    { "label": "P2 end", "value": "775 unit/integration · 2 e2e", "source": "experiments/P2/LOG.md § Tests and checks" }
+  ],
+  "tokens": [
+    { "phase": "P1", "tokens": "24.96M", "cost": "~$14.93", "source": "experiments/P1/LOG.md § Metrics" },
+    { "phase": "P2", "tokens": "~85.4M", "cost": "~$38.2", "source": "experiments/P2/LOG.md § Metrics (coordinator share derived)" }
+  ]
+}
