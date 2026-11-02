@@ -9,6 +9,7 @@ This log continues `experiments/P3/FAILURES.md` and `experiments/P3/GATE_SUMMARY
 | F19 | #12079 (EXP-09 closeout, #46) | 13341 and 13351 (2026-11-02, about 13:12 UTC) | Claude Code upstream error after a bash step (closeout PR #53 created); the automatic retry failed too | manual resume by #52; state checked first (PR #53 open, CI green) | none: no step repeated |
 | F20 | #13171 (EXP-07/08, #47/#48) | 13206 (2026-11-02 13:09:52) | Claude Code upstream error on the branch's first model call. #52's resume note called it F19, but that ID was already taken, so it is F20 | manual resume by #52 | none: no work had started |
 | F21 | #52 (root) | 12748 (13:04:09), 13370 (13:13:36), 13452 (13:14:38) | Claude Code upstream error, 3 calls in the same burst | automatic retry / resume | none |
+| F22 | #13171 (EXP-07/08, #47/#48) | 13891 (2026-11-02 about 13:24) | Claude Code upstream error (relay `AggregateError`) on the coordinator, after a grading step; automatic retry did not recover | manual resume by #52; state checked first (subagents listed, worktrees inspected) | none: no step repeated; it fell inside the task-1 Ultimate arm's window while QA ran, noted in EXP-08 RUN-20261102-01 |
 
 All F1–F21 rows with the text `relay failure AggregateError:` share the root cause below.
 

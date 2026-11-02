@@ -1,0 +1,462 @@
+diff --git a/tests/qa/gates.qa.test.ts b/tests/qa/gates.qa.test.ts
+new file mode 100644
+index 0000000..b72fc7f
+--- /dev/null
++++ b/tests/qa/gates.qa.test.ts
+@@ -0,0 +1,456 @@
++/**
++ * Independent QA acceptance tests for EXP-08 task 2 "gateStatus" (`src/domain/gates.ts`).
++ *
++ * Black-box, written from the acceptance criteria alone (AC1-AC6 below), `src/domain/types.ts`, `schedule()` and
++ * `validateDocument()`. Every hand-built document passes `validateDocument` (checked in `docOf`).
++ *
++ *   AC1  four entries, in GATES order, whatever the task order
++ *   AC2  defined gate: defined / taskId / status / done come from the gate task (done only for status 'done')
++ *   AC3  forecastFinishDate / slipDays equal schedule(doc) for the gate task, targetDate is the task's own;
++ *        the scheduler is delegated to, not reimplemented
++ *   AC4  undefined gate: exactly { gate, defined: false, done: false }
++ *   AC5  non-applicable optional fields are absent (no undefined-valued keys, no null); JSON.stringify is stable
++ *   AC6  pure: no clock / randomness / I/O, input not mutated, identical input gives identical output
++ *
++ * Hand-derived dates (calendar: Mon-Fri, day 0 = 2026-01-05, a Monday; ADR-002 §1, §3, §6):
++ *   day index -> date: 0 Mon 01-05, 1 Tue 01-06, 2 Wed 01-07, 3 Thu 01-08, 4 Fri 01-09, 5 Mon 01-12, 6 Tue 01-13,
++ *   7 Wed 01-14; day -1 (a done task) is Fri 2026-01-02. A 0-day gate finishes on (latest predecessor finish).
++ */
++import { readFileSync } from 'node:fs'
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { gateStatus, type GateStatus } from '../../src/domain/gates'
++import { schedule } from '../../src/domain/schedule'
++import { GATES, type Gate, type ReleaseDocument, type Task } from '../../src/domain/types'
++import { validateDocument } from '../../src/domain/validate'
++
++// ---------------------------------------------------------------- builders
++
++const STREAMS = ['FW', 'SPS', 'Security', 'App', 'QA']
++
++/** An ordinary task (>= 1 day; ADR-002 §2: 0 days is only allowed on a gate task). */
++function task(id: string, stream: string, estimateDays: number, over: Partial<Task> = {}): Task {
++  return { id, title: id, stream, ownerRole: 'owner', status: 'todo', estimateDays, predecessors: [], ...over }
++}
++
++/** A 0-day gate task. */
++function gate(id: string, stream: string, gateName: Gate, predecessors: string[], over: Partial<Task> = {}): Task {
++  return task(id, stream, 0, { gate: gateName, predecessors, ...over })
++}
++
++/** A document that must pass validateDocument (a mistake here is reported as such, not as a gateStatus failure). */
++function docOf(tasks: Task[], release: ReleaseDocument['release'] = { startDate: '2026-01-05' }): ReleaseDocument {
++  const document: ReleaseDocument = { schemaVersion: 1, release, workstreams: [...STREAMS], tasks }
++  const validation = validateDocument(document)
++  if (!validation.ok) throw new Error(`QA document is invalid: ${JSON.stringify(validation.errors)}`)
++  return document
++}
++
++const fixture = (): ReleaseDocument => {
++  const parsed = validateDocument(JSON.parse(readFileSync('fixtures/release.json', 'utf8')))
++  if (!parsed.ok) throw new Error('fixtures/release.json is invalid')
++  return parsed.document
++}
++
++/** Partial document D1: three gates defined (todo + target, in progress + no target, done + target), qa-complete not defined. */
++function partialDoc(): ReleaseDocument {
++  return docOf([
++    task('FW1', 'FW', 3), // days 0-2
++    gate('G-FW', 'FW', 'fw-integrated', ['FW1'], { status: 'in_progress', targetDate: '2026-01-06' }), // finish day 2 = Wed 01-07; target Tue 01-06 -> slip +1
++    task('SEC1', 'Security', 5), // days 0-4
++    gate('G-SEC', 'Security', 'security-verified', ['SEC1']), // finish day 4 = Fri 01-09; no target
++    gate('G-APP', 'App', 'app-integration', [], { status: 'done', targetDate: '2026-01-05' }), // done: day -1 = Fri 01-02; target Mon 01-05 -> slip -1
++  ])
++}
++
++/**
++ * Full document D2: all four gates defined, listed in reverse of GATES order, with targets giving slip +1, 0, -3, +3.
++ * FW1 and FW2 share the FW stream (capacity serialises them), so a forecast that ignores capacity is wrong.
++ */
++function fullDoc(): ReleaseDocument {
++  return docOf([
++    gate('G-QA', 'QA', 'qa-complete', ['G-FW', 'G-SEC', 'G-APP'], { targetDate: '2026-01-09' }), // ready day 8 -> finish day 7 = Wed 01-14; target Fri 01-09 -> slip +3
++    gate('G-APP', 'App', 'app-integration', ['APP1'], { targetDate: '2026-01-19' }), // finish day 7 = Wed 01-14; target Mon 01-19 -> slip -3
++    task('APP1', 'App', 8, { targetDate: '2030-01-01' }), // days 0-7; a non-gate target must not leak into any gate
++    gate('G-SEC', 'Security', 'security-verified', ['SEC1'], { targetDate: '2026-01-09' }), // finish day 4 = Fri 01-09 -> slip 0
++    task('SEC1', 'Security', 5), // days 0-4
++    gate('G-FW', 'FW', 'fw-integrated', ['FW1', 'FW2'], { status: 'in_progress', targetDate: '2026-01-08' }), // finish day 4 = Fri 01-09; target Thu 01-08 -> slip +1
++    task('FW2', 'FW', 2), // FW1 takes days 0-2, so FW2 is days 3-4
++    task('FW1', 'FW', 3),
++  ])
++}
++
++const byGate = (list: GateStatus[], g: Gate): GateStatus => {
++  const found = list.find((e) => e.gate === g)
++  if (!found) throw new Error(`no entry for ${g}`)
++  return found
++}
++
++/** Deterministic permutations of a task list: reversed, rotated by one, and interleaved. */
++function reorderings(doc: ReleaseDocument): ReleaseDocument[] {
++  const t = doc.tasks
++  const interleaved = [...t.filter((_, i) => i % 2 === 1), ...t.filter((_, i) => i % 2 === 0)]
++  return [[...t].reverse(), [...t.slice(1), ...t.slice(0, 1)], interleaved].map((tasks) => ({ ...doc, tasks }))
++}
++
++function deepFreeze<T>(value: T): T {
++  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
++    Object.freeze(value)
++    for (const v of Object.values(value)) deepFreeze(v)
++  }
++  return value
++}
++
++afterEach(() => {
++  vi.useRealTimers()
++  vi.restoreAllMocks()
++  vi.doUnmock('../../src/domain/schedule')
++  vi.resetModules()
++})
++
++// ---------------------------------------------------------------- AC1
++
++describe('AC1: exactly four entries, in GATES order, whatever the task order', () => {
++  it('the GATES order the module must follow is the one in types.ts', () => {
++    expect([...GATES]).toEqual(['fw-integrated', 'security-verified', 'app-integration', 'qa-complete'])
++  })
++
++  it('the fixture gives four entries in GATES order', () => {
++    expect(gateStatus(fixture()).map((e) => e.gate)).toEqual([...GATES])
++  })
++
++  it('a document whose tasks list the gates in reverse GATES order still gives GATES order', () => {
++    const result = gateStatus(fullDoc()) // G-QA, G-APP, G-SEC, G-FW in document order
++    expect(result).toHaveLength(4)
++    expect(result.map((e) => e.gate)).toEqual([...GATES])
++  })
++
++  it('reordering the tasks changes neither the entries nor their order', () => {
++    for (const doc of [fullDoc(), partialDoc(), fixture()]) {
++      const base = gateStatus(doc)
++      for (const reordered of reorderings(doc)) {
++        expect(gateStatus(reordered)).toStrictEqual(base)
++        expect(gateStatus(reordered).map((e) => e.gate)).toEqual([...GATES])
++      }
++    }
++  })
++
++  it('a document with no gate at all, and one with no tasks, still give four entries in GATES order', () => {
++    for (const doc of [docOf([task('T1', 'FW', 2)]), docOf([])]) {
++      const result = gateStatus(doc)
++      expect(result).toHaveLength(4)
++      expect(result.map((e) => e.gate)).toEqual([...GATES])
++    }
++  })
++
++  it('a single defined gate does not shift the others: its entry sits at its GATES index', () => {
++    const doc = docOf([gate('G-APP', 'App', 'app-integration', [])])
++    const result = gateStatus(doc)
++    expect(result.map((e) => e.defined)).toEqual([false, false, true, false])
++  })
++})
++
++// ---------------------------------------------------------------- AC2
++
++describe('AC2: a defined gate carries defined, taskId, status and done from its task', () => {
++  it('the fixture: every gate is defined with its task id and status (todo, so not done)', () => {
++    const result = gateStatus(fixture())
++    const expected: [Gate, string][] = [
++      ['fw-integrated', 'FW-06'],
++      ['security-verified', 'SEC-05'],
++      ['app-integration', 'APP-05'],
++      ['qa-complete', 'QA-04'],
++    ]
++    for (const [g, taskId] of expected) {
++      const entry = byGate(result, g)
++      expect(entry.defined).toBe(true)
++      expect(entry.taskId).toBe(taskId)
++      expect(entry.status).toBe('todo')
++      expect(entry.done).toBe(false)
++    }
++  })
++
++  it('done is true only for status done: todo, in_progress and done tasks', () => {
++    const result = gateStatus(partialDoc())
++    expect(byGate(result, 'fw-integrated')).toMatchObject({ defined: true, taskId: 'G-FW', status: 'in_progress', done: false })
++    expect(byGate(result, 'security-verified')).toMatchObject({ defined: true, taskId: 'G-SEC', status: 'todo', done: false })
++    expect(byGate(result, 'app-integration')).toMatchObject({ defined: true, taskId: 'G-APP', status: 'done', done: true })
++  })
++
++  it('done follows the gate task, not the other tasks of the document', () => {
++    // everything except the gate is done: the gate is still open
++    const open = docOf([task('A', 'FW', 3, { status: 'done' }), gate('G-FW', 'FW', 'fw-integrated', ['A'])])
++    expect(byGate(gateStatus(open), 'fw-integrated')).toMatchObject({ status: 'todo', done: false })
++    // the gate is done while an ordinary task is open
++    const closed = docOf([task('A', 'FW', 3), gate('G-FW', 'FW', 'fw-integrated', [], { status: 'done' })])
++    expect(byGate(gateStatus(closed), 'fw-integrated')).toMatchObject({ status: 'done', done: true })
++  })
++
++  it('a gate is found by its gate field, not by the task id or stream (ids and streams that look like other gates)', () => {
++    const doc = docOf([
++      gate('qa-complete', 'FW', 'fw-integrated', []), // id of another gate
++      gate('fw-integrated', 'QA', 'qa-complete', [], { status: 'done' }), // swapped
++    ])
++    const result = gateStatus(doc)
++    expect(byGate(result, 'fw-integrated')).toMatchObject({ defined: true, taskId: 'qa-complete', status: 'todo', done: false })
++    expect(byGate(result, 'qa-complete')).toMatchObject({ defined: true, taskId: 'fw-integrated', status: 'done', done: true })
++    expect(byGate(result, 'security-verified').defined).toBe(false)
++  })
++
++  it('an ordinary task is never reported as a gate', () => {
++    const result = gateStatus(partialDoc())
++    const ids = result.flatMap((e) => e.taskId ?? [])
++    expect(ids.sort()).toEqual(['G-APP', 'G-FW', 'G-SEC'])
++  })
++})
++
++// ---------------------------------------------------------------- AC3
++
++describe('AC3: forecastFinishDate and slipDays come from schedule(doc); targetDate is the task own', () => {
++  it('hand-derived values on the full document (+1, 0, -3, +3 days of slip; capacity-serialised FW)', () => {
++    const result = gateStatus(fullDoc())
++    expect(byGate(result, 'fw-integrated')).toMatchObject({ forecastFinishDate: '2026-01-09', targetDate: '2026-01-08', slipDays: 1 })
++    expect(byGate(result, 'security-verified')).toMatchObject({ forecastFinishDate: '2026-01-09', targetDate: '2026-01-09', slipDays: 0 })
++    expect(byGate(result, 'app-integration')).toMatchObject({ forecastFinishDate: '2026-01-14', targetDate: '2026-01-19', slipDays: -3 })
++    expect(byGate(result, 'qa-complete')).toMatchObject({ forecastFinishDate: '2026-01-14', targetDate: '2026-01-09', slipDays: 3 })
++  })
++
++  it('slipDays 0 is kept (a gate on target is not "no slip data")', () => {
++    const entry = byGate(gateStatus(fullDoc()), 'security-verified')
++    expect(entry.slipDays).toBe(0)
++    expect('slipDays' in entry).toBe(true)
++  })
++
++  it('hand-derived values for a done gate (finished on day -1) and for a gate without target', () => {
++    const result = gateStatus(partialDoc())
++    expect(byGate(result, 'app-integration')).toMatchObject({ forecastFinishDate: '2026-01-02', targetDate: '2026-01-05', slipDays: -1 })
++    expect(byGate(result, 'fw-integrated')).toMatchObject({ forecastFinishDate: '2026-01-07', targetDate: '2026-01-06', slipDays: 1 })
++    expect(byGate(result, 'security-verified').forecastFinishDate).toBe('2026-01-09')
++  })
++
++  it('equals the gate task finishDate and slipDays in schedule(doc), for every defined gate of several documents', () => {
++    for (const doc of [fixture(), fullDoc(), partialDoc()]) {
++      const forecast = schedule(doc)
++      for (const entry of gateStatus(doc)) {
++        if (!entry.defined) continue
++        const scheduled = forecast.tasks.find((t) => t.id === entry.taskId)!
++        const task = doc.tasks.find((t) => t.id === entry.taskId)!
++        expect(entry.forecastFinishDate).toBe(scheduled.finishDate)
++        expect(entry.slipDays).toBe(scheduled.slipDays)
++        expect(entry.targetDate).toBe(task.targetDate)
++      }
++    }
++  })
++
++  it('the fixture: targetDate is the gate task own targetDate', () => {
++    const result = gateStatus(fixture())
++    expect(byGate(result, 'fw-integrated').targetDate).toBe('2027-01-22')
++    expect(byGate(result, 'security-verified').targetDate).toBe('2027-02-05')
++    expect(byGate(result, 'app-integration').targetDate).toBe('2027-01-29')
++    expect(byGate(result, 'qa-complete').targetDate).toBe('2027-02-12')
++  })
++
++  it('the release targetDate and other tasks targets are not used: slip is measured against the gate task target', () => {
++    const doc = fullDoc()
++    const withRelease: ReleaseDocument = { ...doc, release: { startDate: '2026-01-05', targetDate: '2026-03-02' } }
++    expect(gateStatus(withRelease)).toStrictEqual(gateStatus(doc))
++    // a release target alone gives a gate without own target neither targetDate nor slipDays
++    const noTarget = docOf([task('A', 'FW', 3), gate('G-FW', 'FW', 'fw-integrated', ['A'])], { startDate: '2026-01-05', targetDate: '2026-01-06' })
++    const entry = byGate(gateStatus(noTarget), 'fw-integrated')
++    expect(entry.forecastFinishDate).toBe('2026-01-07')
++    expect('targetDate' in entry).toBe(false)
++    expect('slipDays' in entry).toBe(false)
++  })
++
++  it('a weekend start date shifts the forecast through schedule() (day 0 is the following Monday)', () => {
++    // start Sat 2026-01-03 -> day 0 = Mon 01-05; a 3-day task + gate finish Wed 01-07
++    const doc = docOf([task('A', 'FW', 3), gate('G-FW', 'FW', 'fw-integrated', ['A'], { targetDate: '2026-01-05' })], { startDate: '2026-01-03' })
++    expect(byGate(gateStatus(doc), 'fw-integrated')).toMatchObject({ forecastFinishDate: '2026-01-07', slipDays: 2 })
++  })
++
++  it('delegates to schedule(): the values come from the scheduler, whatever it returns', async () => {
++    // Implementation-coupled on purpose ("do not reimplement the scheduler"): replace schedule() with a stub that
++    // returns values no reimplementation could produce, and check they arrive in the entries.
++    const doc = fullDoc()
++    const fake = (d: ReleaseDocument) => ({
++      day0: '2026-01-05',
++      finish: 99,
++      finishDate: '9999-12-31',
++      tasks: [...d.tasks]
++        .sort((a, b) => (a.id < b.id ? -1 : 1))
++        .map((t, i) => ({
++          id: t.id,
++          start: 0,
++          finish: 0,
++          finishDate: `3000-01-${String(10 + i).padStart(2, '0')}`,
++          ...(t.targetDate === undefined ? {} : { slipDays: 700 + i }),
++        })),
++    })
++    vi.resetModules()
++    vi.doMock('../../src/domain/schedule', () => ({ schedule: fake }))
++    const { gateStatus: mocked } = await import('../../src/domain/gates')
++    const stub = fake(doc).tasks
++    const result = mocked(doc)
++    for (const entry of result) {
++      const scheduled = stub.find((t) => t.id === entry.taskId)!
++      expect(entry.forecastFinishDate).toBe(scheduled.finishDate)
++      expect(entry.slipDays).toBe(scheduled.slipDays)
++    }
++  })
++})
++
++// ---------------------------------------------------------------- AC4
++
++describe('AC4: a gate no task carries is { gate, defined: false, done: false } and nothing else', () => {
++  it('no gate in the document: four bare entries', () => {
++    const result = gateStatus(docOf([task('T1', 'FW', 2, { targetDate: '2026-01-06' }), task('T2', 'QA', 1, { status: 'done' })]))
++    expect(result).toStrictEqual(GATES.map((g) => ({ gate: g, defined: false, done: false })))
++    for (const entry of result) expect(Object.keys(entry).sort()).toEqual(['defined', 'done', 'gate'])
++  })
++
++  it('an empty task list: four bare entries', () => {
++    expect(gateStatus(docOf([]))).toStrictEqual(GATES.map((g) => ({ gate: g, defined: false, done: false })))
++  })
++
++  it('only the missing gate of a partial document is bare; the defined ones are not', () => {
++    const result = gateStatus(partialDoc())
++    const missing = byGate(result, 'qa-complete')
++    expect(missing).toStrictEqual({ gate: 'qa-complete', defined: false, done: false })
++    expect(Object.keys(missing).sort()).toEqual(['defined', 'done', 'gate'])
++    expect(result.filter((e) => !e.defined).map((e) => e.gate)).toEqual(['qa-complete'])
++  })
++
++  it('ordinary tasks with targets, statuses and streams of a missing gate do not leak into its entry', () => {
++    const doc = docOf([
++      task('QA-X', 'QA', 2, { status: 'done', targetDate: '2026-01-06' }),
++      gate('G-FW', 'FW', 'fw-integrated', []),
++    ])
++    expect(byGate(gateStatus(doc), 'qa-complete')).toStrictEqual({ gate: 'qa-complete', defined: false, done: false })
++  })
++})
++
++// ---------------------------------------------------------------- AC5
++
++describe('AC5: optional fields that do not apply are absent, so JSON.stringify is stable', () => {
++  const hasNullOrUndefinedValue = (entry: object) => Object.values(entry).some((v) => v === undefined || v === null)
++
++  it('no entry of any document has an undefined or null value', () => {
++    for (const doc of [fixture(), fullDoc(), partialDoc(), docOf([])]) {
++      for (const entry of gateStatus(doc)) expect(hasNullOrUndefinedValue(entry)).toBe(false)
++    }
++  })
++
++  it('a defined gate without targetDate has no targetDate and no slipDays key; the rest is present', () => {
++    const entry = byGate(gateStatus(partialDoc()), 'security-verified')
++    expect(Object.keys(entry).sort()).toEqual(['defined', 'done', 'forecastFinishDate', 'gate', 'status', 'taskId'])
++    expect(entry).toStrictEqual({
++      gate: 'security-verified',
++      defined: true,
++      taskId: 'G-SEC',
++      status: 'todo',
++      done: false,
++      forecastFinishDate: '2026-01-09',
++    })
++  })
++
++  it('a defined gate with targetDate has exactly all eight fields', () => {
++    const entry = byGate(gateStatus(partialDoc()), 'fw-integrated')
++    expect(Object.keys(entry).sort()).toEqual(['defined', 'done', 'forecastFinishDate', 'gate', 'slipDays', 'status', 'targetDate', 'taskId'])
++  })
++
++  it('JSON round trip loses nothing and adds nothing (toStrictEqual sees undefined-valued keys)', () => {
++    for (const doc of [fixture(), fullDoc(), partialDoc(), docOf([])]) {
++      const result = gateStatus(doc)
++      expect(JSON.parse(JSON.stringify(result))).toStrictEqual(result)
++    }
++  })
++
++  it('the JSON text carries no "null" and no key of an absent field', () => {
++    const text = JSON.stringify(gateStatus(partialDoc()))
++    expect(text).not.toContain('null')
++    const parsed = JSON.parse(text) as GateStatus[]
++    expect('targetDate' in byGate(parsed, 'security-verified')).toBe(false)
++    expect('slipDays' in byGate(parsed, 'security-verified')).toBe(false)
++    expect('taskId' in byGate(parsed, 'qa-complete')).toBe(false)
++    expect('status' in byGate(parsed, 'qa-complete')).toBe(false)
++    expect('forecastFinishDate' in byGate(parsed, 'qa-complete')).toBe(false)
++  })
++
++  it('JSON.stringify is stable: same text across calls, copies and task orders', () => {
++    for (const doc of [fixture(), fullDoc(), partialDoc()]) {
++      const text = JSON.stringify(gateStatus(doc))
++      expect(JSON.stringify(gateStatus(doc))).toBe(text)
++      expect(JSON.stringify(gateStatus(structuredClone(doc)))).toBe(text)
++      for (const reordered of reorderings(doc)) expect(JSON.stringify(gateStatus(reordered))).toBe(text)
++    }
++  })
++})
++
++// ---------------------------------------------------------------- AC6
++
++describe('AC6: pure; the input is not mutated; identical input gives identical output', () => {
++  it('a deeply frozen document is accepted (any write would throw in strict mode) and stays equal to its snapshot', () => {
++    for (const build of [fixture, fullDoc, partialDoc]) {
++      const doc = build()
++      const snapshot = structuredClone(doc)
++      deepFreeze(doc)
++      expect(() => gateStatus(doc)).not.toThrow()
++      expect(doc).toStrictEqual(snapshot)
++    }
++  })
++
++  it('an unfrozen document is unchanged after the call (including task order)', () => {
++    const doc = fullDoc()
++    const snapshot = structuredClone(doc)
++    gateStatus(doc)
++    expect(doc).toStrictEqual(snapshot)
++    expect(doc.tasks.map((t) => t.id)).toEqual(snapshot.tasks.map((t) => t.id))
++  })
++
++  it('identical input gives identical output: repeated calls and separately built equal documents', () => {
++    const doc = fixture()
++    const first = gateStatus(doc)
++    expect(gateStatus(doc)).toStrictEqual(first)
++    expect(gateStatus(fixture())).toStrictEqual(first)
++    expect(gateStatus(fullDoc())).toStrictEqual(gateStatus(fullDoc()))
++  })
++
++  it('the result is a fresh value: mutating it neither changes the document nor the next result', () => {
++    const doc = fullDoc()
++    const snapshot = structuredClone(doc)
++    const first = gateStatus(doc)
++    const copy = structuredClone(first)
++    first.reverse()
++    first[0]!.done = !first[0]!.done
++    first.length = 0
++    expect(gateStatus(doc)).toStrictEqual(copy)
++    expect(doc).toStrictEqual(snapshot)
++  })
++
++  it('does not read the clock or randomness: same output at different system times, with Math.random and Date.now forbidden', () => {
++    const doc = fullDoc()
++    vi.useFakeTimers()
++    vi.setSystemTime(new Date('2001-02-03T04:05:06Z'))
++    const early = gateStatus(doc)
++    vi.setSystemTime(new Date('2090-12-31T23:59:59Z'))
++    const late = gateStatus(doc)
++    expect(late).toStrictEqual(early)
++    vi.useRealTimers()
++    vi.spyOn(Math, 'random').mockImplementation(() => {
++      throw new Error('Math.random called')
++    })
++    vi.spyOn(Date, 'now').mockImplementation(() => {
++      throw new Error('Date.now called')
++    })
++    expect(gateStatus(doc)).toStrictEqual(early)
++  })
++
++  it('the source has no I/O, clock or randomness: only relative imports, no Date / Math.random / process / fetch / fs', () => {
++    const source = readFileSync('src/domain/gates.ts', 'utf8')
++      .replace(/\/\*[\s\S]*?\*\//g, '')
++      .replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
++    const specifiers = [...source.matchAll(/(?:from|import\()\s*['"]([^'"]+)['"]/g)].map((m) => m[1]!)
++    for (const spec of specifiers) expect(spec, `import ${spec}`).toMatch(/^\.\.?\//)
++    expect(source).not.toMatch(/\bnew\s+Date\b|\bDate\.(now|parse|UTC)\b|\bMath\.random\b|\bperformance\.now\b|\bcrypto\b/)
++    expect(source).not.toMatch(/\bprocess\b|\bfetch\s*\(|\brequire\s*\(|\bXMLHttpRequest\b|\blocalStorage\b|\bconsole\./)
++  })
++})

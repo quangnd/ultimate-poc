@@ -1,0 +1,567 @@
+diff --git a/tests/qa/links.qa.test.ts b/tests/qa/links.qa.test.ts
+new file mode 100644
+index 0000000..b2ae7cf
+--- /dev/null
++++ b/tests/qa/links.qa.test.ts
+@@ -0,0 +1,561 @@
++/**
++ * Independent QA acceptance tests for EXP-08 task 1: `src/domain/links.ts` (`addLink`, `removeLink`).
++ *
++ * Black-box, written from the task's acceptance criteria (AC1..AC8), ADR-002 §9, `src/domain/types.ts`,
++ * `src/domain/validate.ts` and `fixtures/release.json` only. The existing `validateDocument` is the oracle: for
++ * every (task, predecessor) pair the expected outcome of `addLink` is derived from validating the document with that
++ * link appended, so codes, the reported cycle and its message are compared with what the validator itself says.
++ *
++ * Asserted: `ok`, error count, `code`, `taskId` (where the AC fixes it), `cycle` and the cycle `message`. No other
++ * message text is asserted, nor the order of the error list.
++ */
++import { readFileSync } from 'node:fs'
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { addLink, removeLink, type LinkError, type LinkResult } from '../../src/domain/links'
++import type { ReleaseDocument, Task } from '../../src/domain/types'
++import { validateDocument, type ValidationError } from '../../src/domain/validate'
++
++// ---------------------------------------------------------------- helpers
++
++/** A fresh, mutable copy of fixtures/release.json (valid: see the guard test below). */
++const release = (): ReleaseDocument => JSON.parse(readFileSync(new URL('../../fixtures/release.json', import.meta.url), 'utf8')) as ReleaseDocument
++const cycleVariant = (): ReleaseDocument => JSON.parse(readFileSync(new URL('../../fixtures/cycle-variant.json', import.meta.url), 'utf8')) as ReleaseDocument
++
++const NOW = '2026-01-05'
++function t(id: string, predecessors: string[] = [], over: Partial<Task> = {}): Task {
++  return { id, title: `Task ${id}`, stream: 'FW', ownerRole: 'owner', status: 'todo', estimateDays: 1, predecessors, ...over }
++}
++
++/**
++ * Small valid document whose task order and predecessor orders are deliberately NOT sorted, so "append at the end",
++ * "same order" and "remaining predecessors keep their order" cannot be met by sorting. Task C is a gate with a target date.
++ */
++function small(): ReleaseDocument {
++  return {
++    schemaVersion: 1,
++    release: { startDate: NOW, targetDate: '2026-02-06' },
++    workstreams: ['FW', 'QA'],
++    tasks: [
++      t('C', [], { stream: 'QA', estimateDays: 0, gate: 'qa-complete', targetDate: '2026-01-09' }),
++      t('A'),
++      t('E', ['C', 'A', 'D'], { status: 'in_progress', targetDate: '2026-01-30' }),
++      t('B'),
++      t('D', ['B'], { status: 'done' }),
++    ],
++  }
++}
++
++const clone = <T>(v: T): T => structuredClone(v)
++
++function deepFreeze<T>(value: T): T {
++  if (value !== null && typeof value === 'object') {
++    Object.freeze(value)
++    for (const v of Object.values(value)) deepFreeze(v)
++  }
++  return value
++}
++
++/** The document `doc` with task `id`'s predecessors replaced; everything else is a structural copy. */
++function withPreds(doc: ReleaseDocument, id: string, predecessors: string[]): ReleaseDocument {
++  const copy = clone(doc)
++  const task = copy.tasks.find((x) => x.id === id)
++  if (!task) throw new Error(`no task ${id}`)
++  task.predecessors = predecessors
++  return copy
++}
++
++const predsOf = (doc: ReleaseDocument, id: string): string[] => doc.tasks.find((x) => x.id === id)!.predecessors
++
++function okDoc(result: LinkResult): ReleaseDocument {
++  if (!result.ok) throw new Error(`expected ok, got errors ${JSON.stringify(result.errors)}`)
++  return result.document
++}
++
++function errorsOf(result: LinkResult): LinkError[] {
++  if (result.ok) throw new Error('expected a failure, but the call succeeded')
++  expect(result.ok).toBe(false)
++  for (const e of result.errors) {
++    expect(typeof e.code).toBe('string')
++    expect(typeof e.message).toBe('string')
++    expect(e.message.length).toBeGreaterThan(0)
++  }
++  return result.errors
++}
++
++/** The single error of a failed call. */
++function onlyError(result: LinkResult): LinkError {
++  const errors = errorsOf(result)
++  expect(errors).toHaveLength(1)
++  return errors[0]!
++}
++
++function validatorErrors(doc: unknown): ValidationError[] {
++  const v = validateDocument(doc)
++  if (v.ok) throw new Error('expected the validator to reject the document')
++  return v.errors
++}
++
++const idsOf = (doc: ReleaseDocument): string[] => doc.tasks.map((x) => x.id)
++
++/** Every id of the document plus ids that are not in it. */
++const withUnknown = (doc: ReleaseDocument): string[] => [...idsOf(doc), 'NOPE-99', 'fw-01', 'constructor', '__proto__']
++
++afterEach(() => vi.restoreAllMocks())
++
++// ---------------------------------------------------------------- guards of the test data
++
++describe('QA test data', () => {
++  it('fixtures/release.json and the small document are valid; cycle-variant.json is release.json plus FW-05 <- SEC-04', () => {
++    expect(validateDocument(release()).ok).toBe(true)
++    expect(validateDocument(small()).ok).toBe(true)
++    expect(validateDocument(withPreds(release(), 'FW-05', ['FW-04', 'SEC-04']))).toEqual(validateDocument(cycleVariant()))
++  })
++})
++
++// ---------------------------------------------------------------- AC1 addLink success
++
++describe('AC1: addLink success appends the predecessor and changes nothing else', () => {
++  it('appends at the END of a non-empty list (not sorted: FW-01 sorts before SEC-01) on fixtures/release.json', () => {
++    const before = release()
++    const result = addLink(before, 'SEC-02', 'FW-01')
++    expect(predsOf(okDoc(result), 'SEC-02')).toEqual(['SEC-01', 'FW-01'])
++    expect(okDoc(result)).toStrictEqual(withPreds(release(), 'SEC-02', ['SEC-01', 'FW-01']))
++  })
++
++  it('fills an empty list', () => {
++    const doc = okDoc(addLink(release(), 'QA-01', 'FW-01'))
++    expect(predsOf(doc, 'QA-01')).toEqual(['FW-01'])
++    expect(doc).toStrictEqual(withPreds(release(), 'QA-01', ['FW-01']))
++  })
++
++  it('keeps the same tasks in the same order and every other task and field strictly equal (no added keys such as `gate: undefined`)', () => {
++    const original = release()
++    const doc = okDoc(addLink(original, 'SPS-04', 'SEC-01'))
++    expect(idsOf(doc)).toEqual(idsOf(original))
++    expect(doc.tasks).toHaveLength(original.tasks.length)
++    expect(doc.schemaVersion).toBe(1)
++    expect(doc.release).toStrictEqual(original.release)
++    expect(doc.workstreams).toStrictEqual(original.workstreams)
++    doc.tasks.forEach((task, i) => {
++      const old = original.tasks[i]!
++      if (task.id === 'SPS-04') expect(task).toStrictEqual({ ...old, predecessors: [...old.predecessors, 'SEC-01'] })
++      else expect(task).toStrictEqual(old)
++    })
++  })
++
++  it('does not touch the optional fields (gate, targetDate) of the target task', () => {
++    const doc = okDoc(addLink(release(), 'FW-06', 'SPS-01'))
++    const task = doc.tasks.find((x) => x.id === 'FW-06')!
++    expect(task).toStrictEqual({ ...release().tasks.find((x) => x.id === 'FW-06')!, predecessors: ['FW-05', 'SPS-01'] })
++    expect(task.gate).toBe('fw-integrated')
++    expect(task.targetDate).toBe('2027-01-22')
++  })
++
++  it('on an unsorted-order document: appends last, task order and the other predecessor orders stay', () => {
++    const doc = okDoc(addLink(small(), 'E', 'B'))
++    expect(idsOf(doc)).toEqual(['C', 'A', 'E', 'B', 'D'])
++    expect(predsOf(doc, 'E')).toEqual(['C', 'A', 'D', 'B'])
++    expect(doc).toStrictEqual(withPreds(small(), 'E', ['C', 'A', 'D', 'B']))
++  })
++
++  it('may link to a predecessor that is later in the task list, and to or from gates and done tasks', () => {
++    expect(okDoc(addLink(small(), 'A', 'D'))).toStrictEqual(withPreds(small(), 'A', ['D']))
++    expect(okDoc(addLink(small(), 'C', 'D'))).toStrictEqual(withPreds(small(), 'C', ['D']))
++    expect(okDoc(addLink(small(), 'D', 'A'))).toStrictEqual(withPreds(small(), 'D', ['B', 'A']))
++  })
++
++  it('every acyclic (task, predecessor) pair of fixtures/release.json and the small document gives exactly the appended document', () => {
++    let accepted = 0
++    for (const base of [release(), small()]) {
++      for (const task of base.tasks) {
++        for (const p of idsOf(base)) {
++          const candidate = withPreds(base, task.id, [...task.predecessors, p])
++          if (!validateDocument(candidate).ok) continue
++          accepted++
++          expect(okDoc(addLink(clone(base), task.id, p)), `${task.id} <- ${p}`).toStrictEqual(candidate)
++        }
++      }
++    }
++    expect(accepted).toBeGreaterThan(300) // guards the sweep against being vacuous
++  })
++})
++
++// ---------------------------------------------------------------- AC2 removeLink success
++
++describe('AC2: removeLink success removes only that predecessor and keeps the order of the rest', () => {
++  it('removes one of two predecessors on fixtures/release.json', () => {
++    expect(okDoc(removeLink(release(), 'SPS-04', 'SPS-03'))).toStrictEqual(withPreds(release(), 'SPS-04', ['FW-04']))
++    expect(okDoc(removeLink(release(), 'SPS-04', 'FW-04'))).toStrictEqual(withPreds(release(), 'SPS-04', ['SPS-03']))
++  })
++
++  it('removes the only predecessor, leaving an empty list', () => {
++    const doc = okDoc(removeLink(release(), 'FW-02', 'FW-01'))
++    expect(predsOf(doc, 'FW-02')).toEqual([])
++    expect(doc).toStrictEqual(withPreds(release(), 'FW-02', []))
++  })
++
++  it('keeps the remaining predecessors in their (unsorted) order, whichever one is removed', () => {
++    expect(predsOf(okDoc(removeLink(small(), 'E', 'C')), 'E')).toEqual(['A', 'D'])
++    expect(predsOf(okDoc(removeLink(small(), 'E', 'A')), 'E')).toEqual(['C', 'D'])
++    expect(predsOf(okDoc(removeLink(small(), 'E', 'D')), 'E')).toEqual(['C', 'A'])
++    expect(predsOf(okDoc(removeLink(release(), 'QA-03', 'APP-05')), 'QA-03')).toEqual(['QA-02', 'SEC-05'])
++  })
++
++  it('keeps tasks, task order, other tasks and every other field strictly equal (gate and targetDate included)', () => {
++    const original = release()
++    const doc = okDoc(removeLink(original, 'FW-06', 'FW-05'))
++    expect(idsOf(doc)).toEqual(idsOf(original))
++    expect(doc.release).toStrictEqual(original.release)
++    expect(doc.workstreams).toStrictEqual(original.workstreams)
++    doc.tasks.forEach((task, i) => {
++      const old = original.tasks[i]!
++      if (task.id === 'FW-06') expect(task).toStrictEqual({ ...old, predecessors: [] })
++      else expect(task).toStrictEqual(old)
++    })
++    const other = okDoc(removeLink(small(), 'E', 'A'))
++    expect(idsOf(other)).toEqual(['C', 'A', 'E', 'B', 'D'])
++    expect(other).toStrictEqual(withPreds(small(), 'E', ['C', 'D']))
++  })
++
++  it('every existing link of fixtures/release.json and the small document can be removed, giving exactly the filtered document', () => {
++    let links = 0
++    for (const base of [release(), small()]) {
++      for (const task of base.tasks) {
++        for (const p of task.predecessors) {
++          links++
++          const expected = withPreds(base, task.id, task.predecessors.filter((x) => x !== p))
++          expect(okDoc(removeLink(clone(base), task.id, p)), `${task.id} -/- ${p}`).toStrictEqual(expected)
++        }
++      }
++    }
++    expect(links).toBeGreaterThan(30)
++  })
++
++  it('add then remove gives back the original; remove then add moves the link to the end', () => {
++    const added = okDoc(addLink(release(), 'SEC-02', 'FW-01'))
++    expect(okDoc(removeLink(added, 'SEC-02', 'FW-01'))).toStrictEqual(release())
++    const removed = okDoc(removeLink(small(), 'E', 'C'))
++    expect(predsOf(okDoc(addLink(removed, 'E', 'C')), 'E')).toEqual(['A', 'D', 'C'])
++  })
++})
++
++// ---------------------------------------------------------------- AC3 input never mutated
++
++describe('AC3: the input document is never mutated, on success or failure', () => {
++  const calls: [string, (d: ReleaseDocument) => LinkResult, boolean][] = [
++    ['addLink success', (d) => addLink(d, 'SEC-02', 'FW-01'), true],
++    ['addLink success on an empty list', (d) => addLink(d, 'QA-01', 'FW-01'), true],
++    ['addLink unknown-task', (d) => addLink(d, 'NOPE-99', 'FW-01'), false],
++    ['addLink unknown-predecessor', (d) => addLink(d, 'FW-03', 'NOPE-99'), false],
++    ['addLink self-predecessor', (d) => addLink(d, 'FW-03', 'FW-03'), false],
++    ['addLink repeated-predecessor', (d) => addLink(d, 'SPS-04', 'FW-04'), false],
++    ['addLink cycle', (d) => addLink(d, 'FW-05', 'SEC-04'), false],
++    ['removeLink success', (d) => removeLink(d, 'SPS-04', 'SPS-03'), true],
++    ['removeLink success of the only predecessor', (d) => removeLink(d, 'FW-02', 'FW-01'), true],
++    ['removeLink unknown-task', (d) => removeLink(d, 'NOPE-99', 'FW-01'), false],
++    ['removeLink unknown-link', (d) => removeLink(d, 'FW-02', 'FW-03'), false],
++  ]
++
++  it.each(calls)('%s leaves a deep-frozen input untouched', (_name, call, ok) => {
++    const frozen = deepFreeze(release()) // a write to the input throws a TypeError in strict mode
++    const snapshot = release()
++    const result = call(frozen)
++    expect(result.ok).toBe(ok)
++    expect(frozen).toStrictEqual(snapshot)
++  })
++
++  it.each(calls)('%s leaves the input structurally equal to a snapshot taken before (not frozen)', (_name, call, ok) => {
++    const input = release()
++    const snapshot = clone(input)
++    const result = call(input)
++    expect(result.ok).toBe(ok)
++    expect(input).toStrictEqual(snapshot)
++    if (result.ok) {
++      // the result is a different document, and its target is not the input's object
++      expect(result.document).not.toStrictEqual(snapshot)
++    }
++  })
++
++  it('the predecessor lists of the input stay the same arrays with the same content after a success', () => {
++    const input = small()
++    const lists = input.tasks.map((x) => x.predecessors)
++    const contents = lists.map((l) => [...l])
++    okDoc(addLink(input, 'E', 'B'))
++    okDoc(removeLink(input, 'E', 'A'))
++    input.tasks.forEach((x, i) => {
++      expect(x.predecessors).toBe(lists[i])
++      expect(x.predecessors).toEqual(contents[i])
++    })
++  })
++})
++
++// ---------------------------------------------------------------- AC4 result validates
++
++describe('AC4: a successful result passes validateDocument', () => {
++  it('for every successful addLink and removeLink on fixtures/release.json and the small document', () => {
++    let successes = 0
++    for (const base of [release(), small()]) {
++      for (const task of base.tasks) {
++        for (const p of idsOf(base)) {
++          const r = addLink(clone(base), task.id, p)
++          if (r.ok) {
++            successes++
++            expect(validateDocument(r.document).ok, `add ${task.id} <- ${p}`).toBe(true)
++          }
++        }
++        for (const p of task.predecessors) {
++          const r = removeLink(clone(base), task.id, p)
++          expect(r.ok, `remove ${task.id} -/- ${p}`).toBe(true)
++          if (r.ok) {
++            successes++
++            expect(validateDocument(r.document).ok, `remove ${task.id} -/- ${p}`).toBe(true)
++          }
++        }
++      }
++    }
++    expect(successes).toBeGreaterThan(300)
++  })
++})
++
++// ---------------------------------------------------------------- AC5 unknown task
++
++describe('AC5: a taskId that is not in the document gives exactly one unknown-task error with that taskId', () => {
++  const unknownTaskIds = ['NOPE-99', 'fw-01', 'FW-01 ', 'constructor', '__proto__']
++
++  it.each(unknownTaskIds)('addLink(%j, a known predecessor)', (taskId) => {
++    const e = onlyError(addLink(release(), taskId, 'FW-01'))
++    expect(e.code).toBe('unknown-task')
++    expect(e.taskId).toBe(taskId)
++  })
++
++  it.each(unknownTaskIds)('removeLink(%j, a known predecessor)', (taskId) => {
++    const e = onlyError(removeLink(release(), taskId, 'FW-01'))
++    expect(e.code).toBe('unknown-task')
++    expect(e.taskId).toBe(taskId)
++  })
++
++  it('an unknown taskId wins when the predecessorId is unknown as well, or the same unknown id (exactly one error)', () => {
++    for (const fn of [addLink, removeLink]) {
++      for (const predecessorId of ['ALSO-NOPE', 'NOPE-99', 'FW-01']) {
++        const e = onlyError(fn(release(), 'NOPE-99', predecessorId))
++        expect(e.code).toBe('unknown-task')
++        expect(e.taskId).toBe('NOPE-99')
++      }
++    }
++  })
++
++  it('also on a document without tasks', () => {
++    const empty: ReleaseDocument = { ...small(), tasks: [] }
++    expect(validateDocument(empty).ok).toBe(true)
++    for (const fn of [addLink, removeLink]) {
++      const e = onlyError(fn(empty, 'A', 'B'))
++      expect(e.code).toBe('unknown-task')
++      expect(e.taskId).toBe('A')
++    }
++  })
++})
++
++// ---------------------------------------------------------------- AC6 addLink errors
++
++describe('AC6: addLink errors use the validator codes and only report what the new link causes', () => {
++  it('a predecessor that is not in the document: unknown-predecessor', () => {
++    for (const p of ['NOPE-99', 'fw-01', '', 'constructor', '__proto__']) {
++      const e = onlyError(addLink(release(), 'FW-03', p))
++      expect(e.code, JSON.stringify(p)).toBe('unknown-predecessor')
++    }
++  })
++
++  it('predecessorId === taskId: self-predecessor only (never also a cycle)', () => {
++    for (const id of ['FW-03', 'FW-01', 'QA-04']) {
++      expect(onlyError(addLink(release(), id, id)).code).toBe('self-predecessor')
++    }
++    expect(onlyError(addLink(small(), 'A', 'A')).code).toBe('self-predecessor')
++  })
++
++  it('a link that already exists: repeated-predecessor only', () => {
++    expect(onlyError(addLink(release(), 'FW-03', 'FW-02')).code).toBe('repeated-predecessor')
++    expect(onlyError(addLink(release(), 'SPS-04', 'FW-04')).code).toBe('repeated-predecessor') // not the first predecessor
++    expect(onlyError(addLink(release(), 'SPS-04', 'SPS-03')).code).toBe('repeated-predecessor') // the first predecessor
++    expect(onlyError(addLink(small(), 'E', 'D')).code).toBe('repeated-predecessor')
++  })
++
++  it('a link that closes a cycle: cycle with the exact list and message the validator gives for the resulting document', () => {
++    const e = onlyError(addLink(release(), 'FW-05', 'SEC-04')) // = fixtures/cycle-variant.json
++    expect(e.code).toBe('cycle')
++    expect(e.cycle).toEqual(['FW-05', 'SEC-04', 'SEC-03'])
++    expect(e.message).toBe('dependency cycle: FW-05 -> SEC-04 -> SEC-03 -> FW-05')
++    const reference = validatorErrors(cycleVariant()).find((x) => x.code === 'cycle')!
++    expect(e.cycle).toEqual(reference.cycle)
++    expect(e.message).toBe(reference.message)
++  })
++
++  it('a two-task cycle, and a long cycle through gates, report the validator cycle (not necessarily starting at the target task)', () => {
++    const two = onlyError(addLink(release(), 'FW-01', 'FW-02'))
++    expect(two.code).toBe('cycle')
++    expect(two.cycle).toEqual(['FW-02', 'FW-01'])
++    expect(two.message).toBe('dependency cycle: FW-02 -> FW-01 -> FW-02')
++
++    const long = onlyError(addLink(release(), 'FW-01', 'QA-04'))
++    expect(long.code).toBe('cycle')
++    expect(long.cycle).toEqual(['APP-03', 'FW-06', 'FW-05', 'FW-04', 'FW-03', 'FW-02', 'FW-01', 'QA-04', 'QA-03', 'APP-05'])
++    expect(long.message).toBe(`dependency cycle: ${[...long.cycle!, long.cycle![0]].join(' -> ')}`)
++  })
++
++  it('a cycle on the unsorted-order small document is reported as the validator reports it', () => {
++    // E <- C already; C <- E closes C -> E -> C
++    const e = onlyError(addLink(small(), 'C', 'E'))
++    const reference = validatorErrors(withPreds(small(), 'C', ['E'])).find((x) => x.code === 'cycle')!
++    expect(e.code).toBe('cycle')
++    expect(e.cycle).toEqual(reference.cycle)
++    expect(e.message).toBe(reference.message)
++  })
++
++  it('oracle sweep: for EVERY (task, predecessor) pair, a rejected link has exactly the validator error codes (and cycle + message) of the document with that link appended', () => {
++    const seen: Record<string, number> = {}
++    for (const base of [release(), small()]) {
++      for (const task of base.tasks) {
++        for (const p of withUnknown(base)) {
++          const candidate = withPreds(base, task.id, [...task.predecessors, p])
++          const verdict = validateDocument(candidate)
++          const result = addLink(clone(base), task.id, p)
++          if (verdict.ok) {
++            expect(result.ok, `${task.id} <- ${p}`).toBe(true)
++            continue
++          }
++          const errors = errorsOf(result)
++          expect(errors.map((e) => e.code).sort(), `${task.id} <- ${p}`).toEqual(verdict.errors.map((e) => e.code).sort())
++          expect(errors, `${task.id} <- ${p}`).toHaveLength(1)
++          const code = errors[0]!.code
++          seen[code] = (seen[code] ?? 0) + 1
++          if (code === 'cycle') {
++            expect(errors[0]!.cycle, `${task.id} <- ${p}`).toEqual(verdict.errors[0]!.cycle)
++            expect(errors[0]!.message, `${task.id} <- ${p}`).toBe(verdict.errors[0]!.message)
++          }
++        }
++      }
++    }
++    // every rejection kind occurred, so the sweep is not vacuous
++    expect(Object.keys(seen).sort()).toEqual(['cycle', 'repeated-predecessor', 'self-predecessor', 'unknown-predecessor'])
++    expect(seen.cycle).toBeGreaterThan(50)
++  })
++
++  it('a rejected link never yields a document', () => {
++    for (const [task, p] of [['FW-03', 'NOPE-99'], ['FW-03', 'FW-03'], ['FW-03', 'FW-02'], ['FW-01', 'FW-02']] as const) {
++      const result = addLink(release(), task, p)
++      expect(result.ok).toBe(false)
++      expect('document' in result).toBe(false)
++    }
++  })
++})
++
++// ---------------------------------------------------------------- AC7 removeLink unknown-link
++
++describe('AC7: removeLink of a link that is not there gives exactly one unknown-link error with the taskId', () => {
++  const cases: [string, string, string][] = [
++    ['the reverse direction of an existing link', 'FW-02', 'FW-03'],
++    ['an unrelated task of the document', 'FW-03', 'QA-04'],
++    ['a task with no predecessors', 'FW-01', 'FW-02'],
++    ['the task itself', 'FW-03', 'FW-03'],
++    ['a predecessor id that is not in the document', 'FW-03', 'NOPE-99'],
++    ['an id that differs only by case', 'FW-03', 'fw-02'],
++    ['the empty string', 'FW-03', ''],
++    ['an object-prototype name', 'FW-03', 'constructor'],
++  ]
++  it.each(cases)('%s: removeLink(%s, %s)', (_label, taskId, predecessorId) => {
++    const e = onlyError(removeLink(release(), taskId, predecessorId))
++    expect(e.code).toBe('unknown-link')
++    expect(e.taskId).toBe(taskId)
++  })
++
++  it('removing the same link twice: the second call is unknown-link', () => {
++    const once = okDoc(removeLink(release(), 'SPS-04', 'SPS-03'))
++    const e = onlyError(removeLink(once, 'SPS-04', 'SPS-03'))
++    expect(e.code).toBe('unknown-link')
++    expect(e.taskId).toBe('SPS-04')
++  })
++
++  it('sweep: every (task, id) pair that is not a link is unknown-link, and a failure never yields a document', () => {
++    let misses = 0
++    for (const base of [release(), small()]) {
++      for (const task of base.tasks) {
++        for (const p of withUnknown(base)) {
++          if (task.predecessors.includes(p)) continue
++          misses++
++          const result = removeLink(clone(base), task.id, p)
++          const e = onlyError(result)
++          expect(e.code, `${task.id} -/- ${p}`).toBe('unknown-link')
++          expect(e.taskId, `${task.id} -/- ${p}`).toBe(task.id)
++          expect('document' in result).toBe(false)
++        }
++      }
++    }
++    expect(misses).toBeGreaterThan(500)
++  })
++})
++
++// ---------------------------------------------------------------- AC8 purity
++
++describe('AC8: pure and deterministic', () => {
++  const operations: [string, (d: ReleaseDocument) => LinkResult][] = [
++    ['addLink success', (d) => addLink(d, 'SEC-02', 'FW-01')],
++    ['addLink cycle', (d) => addLink(d, 'FW-05', 'SEC-04')],
++    ['addLink repeated-predecessor', (d) => addLink(d, 'FW-03', 'FW-02')],
++    ['addLink unknown-task', (d) => addLink(d, 'NOPE-99', 'FW-01')],
++    ['removeLink success', (d) => removeLink(d, 'SPS-04', 'SPS-03')],
++    ['removeLink unknown-link', (d) => removeLink(d, 'FW-02', 'FW-03')],
++  ]
++
++  it.each(operations)('%s: same input, same result, also from a structurally equal copy and after unrelated calls in between', (_name, op) => {
++    const first = op(release())
++    // unrelated calls in between must not leave state behind (caches, counters, memoised results)
++    addLink(release(), 'FW-01', 'FW-02')
++    removeLink(small(), 'E', 'A')
++    addLink(small(), 'E', 'B')
++    const second = op(release())
++    const third = op(clone(release()))
++    expect(second).toStrictEqual(first)
++    expect(third).toStrictEqual(first)
++    // results of the same call are distinct objects: one result cannot be altered through another
++    if (first.ok && second.ok) expect(second.document).not.toBe(first.document)
++  })
++
++  it('does not read the clock or randomness at run time', () => {
++    const random = vi.spyOn(Math, 'random')
++    const dateNow = vi.spyOn(Date, 'now')
++    const perfNow = vi.spyOn(performance, 'now')
++    const uuid = vi.spyOn(globalThis.crypto, 'randomUUID')
++    const values = vi.spyOn(globalThis.crypto, 'getRandomValues')
++    for (const [, op] of operations) op(release())
++    expect(random).not.toHaveBeenCalled()
++    expect(dateNow).not.toHaveBeenCalled()
++    expect(perfNow).not.toHaveBeenCalled()
++    expect(uuid).not.toHaveBeenCalled()
++    expect(values).not.toHaveBeenCalled()
++  })
++
++  it('gives the same results under a different fake system time', () => {
++    const real = operations.map(([, op]) => op(release()))
++    vi.useFakeTimers()
++    try {
++      vi.setSystemTime(new Date('1999-12-31T23:59:59Z'))
++      expect(operations.map(([, op]) => op(release()))).toStrictEqual(real)
++      vi.setSystemTime(new Date('2040-06-15T12:00:00Z'))
++      expect(operations.map(([, op]) => op(release()))).toStrictEqual(real)
++    } finally {
++      vi.useRealTimers()
++    }
++  })
++
++  it('src/domain/links.ts has no I/O, clock, randomness or environment access in its code (static scan, comments removed)', () => {
++    const source = readFileSync(new URL('../../src/domain/links.ts', import.meta.url), 'utf8')
++    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
++    const imports = [...code.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => m[1]!)
++    for (const spec of imports) expect(spec, `import ${spec}`).toMatch(/^\.\/[A-Za-z]+$/) // only sibling domain modules
++    expect(code).not.toMatch(/\bnode:/)
++    expect(code).not.toMatch(/\bimport\s*\(/) // dynamic import
++    expect(code).not.toMatch(/\brequire\s*\(/)
++    expect(code).not.toMatch(/\bDate\b/)
++    expect(code).not.toMatch(/\bMath\.random\b/)
++    expect(code).not.toMatch(/\b(performance|crypto|process|fetch|XMLHttpRequest|localStorage|sessionStorage|setTimeout|setInterval|console)\b/)
++  })
++})

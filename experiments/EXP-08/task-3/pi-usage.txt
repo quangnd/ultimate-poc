@@ -1,0 +1,2 @@
+build.jsonl {"turns":9,"toolCalls":10,"input":20,"output":6372,"cacheRead":232646,"cacheWrite":27763,"total":266801,"usd":0.3129,"models":["anthropic/claude-opus-5-5"],"errors":0}
+review.jsonl {"turns":6,"toolCalls":6,"input":14,"output":3683,"cacheRead":150615,"cacheWrite":15747,"total":170059,"usd":0.1826,"models":["anthropic/claude-opus-5-5"],"errors":0}

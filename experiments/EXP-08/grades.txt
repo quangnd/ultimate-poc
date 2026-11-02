@@ -1,0 +1,86 @@
+## t1-pi-final
+hidden_exit=0
+      Tests  12 passed (12)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  797 passed (797)
+## t1-pi-first
+hidden_exit=0
+      Tests  12 passed (12)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  792 passed (792)
+## t1-single
+hidden_exit=0
+      Tests  12 passed (12)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  791 passed (791)
+## t1-ult-builder
+hidden_exit=0
+      Tests  12 passed (12)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  794 passed (794)
+## t2-pi-final
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  788 passed (788)
+## t2-pi-first
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  783 passed (783)
+## t2-ult-builder
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  785 passed (785)
+## t3-pi-final
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  784 passed (784)
+## t3-pi-first
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  782 passed (782)
+## t3-ult-builder
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  785 passed (785)
+## t3-ult-final
+hidden_exit=0
+      Tests  11 passed (11)
+typecheck_exit=0
+test_exit=0
+ Test Files  17 passed (17)
+      Tests  785 passed (785)
+
+## cross-QA
+xqa-t1-pi-final:       Tests  77 passed (77)
+xqa-t1-pi-first:       Tests  77 passed (77)
+xqa-t1-single:       Tests  77 passed (77)
+xqa-t2-pi-final:       Tests  35 passed (35)
+xqa-t2-pi-first:       Tests  35 passed (35)
+xqa-t3-pi-final:       Tests  41 passed (41)
+xqa-t3-pi-first:       Tests  41 passed (41)
