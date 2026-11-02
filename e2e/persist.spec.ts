@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { expect, test as base } from '@playwright/test'
@@ -100,10 +100,11 @@ for (const run of [1, 2]) {
     await page.getByRole('link', { name: 'Edit plan' }).click()
     await expect(fw03Days).toHaveValue('8')
 
-    // Export is the stored file itself.
-    const exported = await page.request.get('/api/export')
-    expect(exported.ok()).toBe(true)
-    const { tasks } = (await exported.json()) as { tasks: { id: string; estimateDays: number }[] }
+    // Export through the header link, as an operator would (reviewer #6253): the download is the stored file.
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Export' }).click()])
+    expect(download.suggestedFilename()).toBe('release.json')
+    const path = await download.path()
+    const { tasks } = JSON.parse(await readFile(path, 'utf8')) as { tasks: { id: string; estimateDays: number }[] }
     expect(tasks.find((t) => t.id === 'FW-03')).toMatchObject({ estimateDays: 8 })
   })
 }
