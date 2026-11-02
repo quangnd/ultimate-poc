@@ -47,7 +47,7 @@ Investigated 2026-11-02 by side chat #13404 of @ultimate. Status: **ROOT-CAUSED*
 
 **Scale (M, `ultimate.search` on 2026-11-02 ~13:15 UTC).** 22 assistant entries carry `relay failure AggregateError:`, 6 of them on a conversation's first call. 31 entries carry "Incomplete Claude Code upstream response" in total, including 429s and other statuses. The watchdog treats status unknown as temporary and retries once (`extensions/watchdog/server.ts:136`); after that, a manual resume is needed. No committed work was lost or repeated in any case.
 
-**Remediation options (none applied: outside the POC's approved scope, no global or core changes).**
+**Remediation options.** Option 1 was applied on 2026-11-02 23:42Z after PO approval, as a command-line flag on the host only. Evidence and the pending 24 h re-count are in `NETWORK_FIX.md`.
 1. **Recommended, machine-level; approval needed at the P4 gate:** start the Ultimate host with `NODE_OPTIONS=--network-family-autoselection-attempt-timeout=2000`, so the relay process inherits a 2 s attempt timeout. Validation: rerun the 15-connect probe under the setting, then count new `relay failure AggregateError` entries over the next comparable period against the 22 above. Rollback: remove the variable and restart the host.
 2. Make IPv6 work on this network, or disable IPv6 on the interface, so the IPv6 address is not attempted. This is an OS setting.
 3. Upstream fix in `pi-claude-code`: set `autoSelectFamilyAttemptTimeout` in the relay's request, or retry once when the connect fails before any byte arrives. This is the right long-term fix, but it changes Ultimate's dependency.
