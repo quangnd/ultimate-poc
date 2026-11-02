@@ -42,6 +42,8 @@ export function App() {
 
   // Import: choose a file, check it here, show what it holds, and only store it once the operator confirms.
   const [importing, setImporting] = useState<ImportState>({ kind: 'idle' })
+  /** One write at a time: an import waits for an editor save, and the editor is locked while an import runs. */
+  const [editorSaving, setEditorSaving] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const chooseFile = () => fileInput.current?.click()
   const onFile = async (file: File | undefined) => {
@@ -52,10 +54,13 @@ export function App() {
     setImporting({ kind: 'checked', name: file.name, check })
   }
   const store = async (name: string, text: string) => {
+    if (editorSaving || importing.kind === 'importing') return
     const check = checkImport(text)
     if (check.kind !== 'ready') return setImporting({ kind: 'checked', name, check })
     setImporting({ kind: 'importing', name, check })
     const outcome = await importRelease(check.text)
+    // A refusal (400/413) stored nothing, so the draft stays. A failed request has an unknown outcome: the server may
+    // have stored the file before the connection broke, so the panel says so and offers a reload (reviewer #5740).
     if (outcome.kind !== 'imported') return setImporting({ kind: 'refused', name, outcome })
     await reload() // replaces the draft too: the operator confirmed discarding it
     setImporting({ kind: 'imported', name, summary: check.summary })
@@ -87,7 +92,7 @@ export function App() {
         )}
         {(state.kind === 'ready' || state.kind === 'invalid') && (
           <span className="masthead-actions">
-            <button type="button" className="quiet" onClick={chooseFile}>Import…</button>
+            <button type="button" className="quiet" onClick={chooseFile} disabled={editorSaving || importing.kind === 'importing'}>Import…</button>
             {state.kind === 'ready' && (
               <a
                 className="button quiet"
@@ -117,6 +122,10 @@ export function App() {
             onConfirm={confirmImport}
             onChooseAnother={chooseFile}
             onClose={() => setImporting({ kind: 'idle' })}
+            onReload={() => {
+              setImporting({ kind: 'idle' })
+              void reload()
+            }}
           />
         )}
         {state.kind === 'loading' && <p className="muted" role="status">Loading release…</p>}
@@ -142,6 +151,8 @@ export function App() {
             setDraft={setDraft}
             onSaved={reload}
             visible={view === 'edit'}
+            locked={importing.kind === 'importing'}
+            onSavingChange={setEditorSaving}
           />
           </div>
         )}

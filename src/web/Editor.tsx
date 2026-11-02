@@ -38,11 +38,15 @@ interface Props {
   setDraft: (draft: Draft) => void
   /** Reloads the stored release after a save; resolves once the dashboard shows it. */
   onSaved: () => Promise<void>
+  /** An import is in flight: the draft is about to be replaced, so no edit or save may start (reviewer #5740). */
+  locked: boolean
+  /** Reports a save in flight, so the app can hold imports until it finishes (reviewer #5740). */
+  onSavingChange: (saving: boolean) => void
   /** The editor stays mounted on the dashboard (its save state must survive a view switch); ⌘S works only when shown. */
   visible: boolean
 }
 
-export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved, visible }: Props) {
+export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved, visible, locked, onSavingChange }: Props) {
   const [attempt, setAttempt] = useState<Attempt>({ kind: 'none' })
   const [newStream, setNewStream] = useState(base.workstreams[0] ?? '')
   const [focusKey, setFocusKey] = useState<number | undefined>()
@@ -65,7 +69,7 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
   const edit = (next: Draft) => {
     // While a save is in flight the table is inert; an edit made now would be lost when the saved document reloads
     // the draft (reviewer #5081).
-    if (attempt.kind === 'saving') return
+    if (attempt.kind === 'saving' || locked) return
     setDraft(next)
     // A server refusal describes the document it was sent; after any edit, the live check speaks again.
     setAttempt((a) => (a.kind === 'refused-server' || a.kind === 'failed' || a.kind === 'saved' ? { kind: 'none' } : a))
@@ -74,18 +78,20 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
     edit({ ...draft, tasks: draft.tasks.map((t) => (t.key === key ? { ...t, ...patch } : t)) })
 
   async function save() {
-    if (attempt.kind === 'saving') return
+    if (attempt.kind === 'saving' || locked) return
     if (!checked.ok) {
       setAttempt({ kind: 'refused-browser' })
       requestAnimationFrame(() => bannerRef.current?.focus())
       return
     }
     setAttempt({ kind: 'saving' })
+    onSavingChange(true)
     const outcome = await saveRelease(toDocument(base, draft))
     if (outcome.kind === 'saved') {
-      await onSaved()
+      await onSaved().finally(() => onSavingChange(false))
       setAttempt({ kind: 'saved' })
     } else {
+      onSavingChange(false)
       setAttempt(outcome.kind === 'refused' ? { kind: 'refused-server', errors: outcome.errors } : outcome)
       requestAnimationFrame(() => bannerRef.current?.focus())
     }
@@ -148,9 +154,10 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
         changeCount={changeCount}
         dirty={changes.any}
         problems={liveErrors.length}
-        attempt={attempt}
+        attempt={locked ? { kind: 'saving' } : attempt}
         onSave={save}
         onDiscard={() => {
+          if (locked) return
           setDraft(draftFrom(base))
           setAttempt({ kind: 'none' })
         }}
@@ -168,7 +175,7 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
         onGoTo={goTo}
       />
 
-      <section className="section editor-table-section" aria-labelledby="editor-title" inert={attempt.kind === 'saving'} aria-busy={attempt.kind === 'saving'}>
+      <section className="section editor-table-section" aria-labelledby="editor-title" inert={attempt.kind === 'saving' || locked} aria-busy={attempt.kind === 'saving' || locked}>
         <div className="editor-head">
           <h2 id="editor-title">Tasks, links and gates</h2>
           <p className="section-note">

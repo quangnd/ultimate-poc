@@ -50,10 +50,10 @@ export type ImportOutcome =
   | { kind: 'failed'; detail: string }
 
 /** Replaces the stored release (`POST /api/import`); the server validates again and stores nothing it refuses. */
-export async function importRelease(text: string): Promise<ImportOutcome> {
+export async function importRelease(text: string, base = ''): Promise<ImportOutcome> {
   let res: Response
   try {
-    res = await fetch('/api/import', {
+    res = await fetch(`${base}/api/import`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: text,
@@ -62,13 +62,14 @@ export async function importRelease(text: string): Promise<ImportOutcome> {
     return { kind: 'failed', detail: (error as Error).message }
   }
   if (res.status === 413) return { kind: 'too-large' }
+  // A 2xx means the server stored the file, whatever its body (reviewer #5740: only a lost answer is "unknown").
+  if (res.ok) return { kind: 'imported' }
   let body: unknown
   try {
     body = await res.json()
   } catch {
     return { kind: 'failed', detail: `HTTP ${res.status}: the response was not JSON` }
   }
-  if (res.ok) return { kind: 'imported' }
   const errors = (body as { errors?: ValidationError[] }).errors
   if (res.status === 400 && Array.isArray(errors)) return { kind: 'refused', errors }
   const error = (body as { error?: string }).error

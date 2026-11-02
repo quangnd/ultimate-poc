@@ -22,11 +22,13 @@ interface Props {
   onConfirm: () => void
   onChooseAnother: () => void
   onClose: () => void
+  /** After an import with an unknown outcome: reload what is stored (this replaces any unsaved draft). */
+  onReload: () => void
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function ImportPanel({ state, stored, unsavedChanges, onConfirm, onChooseAnother, onClose }: Props) {
+export function ImportPanel({ state, stored, unsavedChanges, onConfirm, onChooseAnother, onClose, onReload }: Props) {
   const ref = useRef<HTMLElement>(null)
   // Each new step takes focus, so a keyboard or screen-reader user lands on the question or the refusal.
   useEffect(() => ref.current?.focus(), [state.kind, state.name])
@@ -43,8 +45,8 @@ export function ImportPanel({ state, stored, unsavedChanges, onConfirm, onChoose
     )
   }
 
-  if (state.kind === 'checked' && state.check.kind !== 'ready') return <Refusal {...{ ref, name: state.name, onChooseAnother, onClose }} reason={state.check} where="browser" />
-  if (state.kind === 'refused') return <Refusal {...{ ref, name: state.name, onChooseAnother, onClose }} reason={state.outcome} where="server" />
+  if (state.kind === 'checked' && state.check.kind !== 'ready') return <Refusal {...{ ref, name: state.name, onChooseAnother, onClose, onReload }} reason={state.check} where="browser" />
+  if (state.kind === 'refused') return <Refusal {...{ ref, name: state.name, onChooseAnother, onClose, onReload }} reason={state.outcome} where="server" />
 
   const { summary } = state.check as Extract<ImportCheck, { kind: 'ready' }>
   const busy = state.kind === 'importing'
@@ -120,6 +122,7 @@ function Refusal({
   where,
   onChooseAnother,
   onClose,
+  onReload,
 }: {
   ref: React.RefObject<HTMLElement | null>
   name: string
@@ -127,6 +130,7 @@ function Refusal({
   where: 'browser' | 'server'
   onChooseAnother: () => void
   onClose: () => void
+  onReload: () => void
 }) {
   const unchanged = 'Nothing was imported; the stored release is unchanged.'
   let lead: React.ReactNode
@@ -139,7 +143,14 @@ function Refusal({
       </>
     )
   } else if (reason.kind === 'failed') {
-    lead = <>The release API did not answer, so nothing was imported. Check that <code>npm run server</code> is running, then try again.</>
+    // The request may have reached the server and been stored before the answer was lost (reviewer #5740).
+    lead = (
+      <>
+        No answer came back from the release API, so it is <strong>unknown whether the file was imported</strong>. Reload
+        the stored release to see which one is stored now. If the API is not running, start it with{' '}
+        <code>npm run server</code>.
+      </>
+    )
   } else {
     lead = (
       <>
@@ -171,6 +182,9 @@ function Refusal({
         </ul>
       ) : null}
       <div className="import-actions">
+        {reason.kind === 'failed' && (
+          <button type="button" className="primary" onClick={onReload}>Reload stored release</button>
+        )}
         <button type="button" onClick={onChooseAnother}>Choose another file</button>
         <button type="button" className="link" onClick={onClose}>Dismiss</button>
       </div>
