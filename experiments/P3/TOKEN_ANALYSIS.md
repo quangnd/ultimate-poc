@@ -32,7 +32,7 @@ Classification rules (D):
   - `text-only`: no tool call.
 - **Context of a call:** input + cacheRead + cacheWrite.
 
-## 1. Token shares (tokens and cost M; shares D)
+## 1. Token shares (tokens and total cost M; per-field cost and shares D)
 
 Coordinator #1510, all 291 opus calls:
 
@@ -211,4 +211,9 @@ None of these changes Ultimate config, Pi settings or providers. Each is a coord
 - opus 1.26M tokens, $2.22: cacheRead 1.07M, cacheWrite 0.16M, output 38k;
 - sonnet 7k, $0.02.
 
-The final figure is in the PR's closing comment on #30. Failures of this analysis: F1 and F7 in `FAILURES.md`.
+Read again at the PR, after review round 2 (M):
+
+- #6558: opus 2.36M tokens ($3.23) and sonnet 24k ($0.07);
+- reviewer #7133: gpt 0.41M ($0.16).
+
+The analysis therefore used about 2.8M tokens, ~$3.47 proxy. Failures of this analysis: F1 and F7 in `FAILURES.md`.
