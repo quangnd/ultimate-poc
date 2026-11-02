@@ -1,21 +1,19 @@
 # Project Checkpoint
 
-Updated: 2026-11-01 (13:46 UTC)
-Current phase: **P1 IN PROGRESS** (P0 gate approved by the Product Owner 13:46 UTC; ADR-001 and ADR-002 Accepted).
-Current focus: #5 scaffold + lander checks, then #6 + #9, then #7, then #8. Merge path: GitHub PR merge only; lander runs checks, no push.
-Last verified commit: `8532805` on main (PR #3 EXP-00 baseline, PR #4 environment/capabilities/ADRs/metrics).
-Active issue: #2 (P0). Drafted for P1, blocked on the gate: #5 scaffold and lander, #6 validation, #7 scheduler, #8 blocking and readiness, #9 fixture.
+Updated: 2026-11-02
+Current phase: **P2 COMPLETE, awaiting the Product Owner's gate approval.** P3 not started.
+Current focus: P2 gate review.
+Last verified commit: `c7d1d9f` on main (PR #27). Fresh clone: `npm ci`, typecheck, 775 unit/integration tests, build and `npm run test:e2e` (2/2) all pass. The lander ran the E2E check on that landing.
+Active issues: none open. P1: #5–#9 closed (PRs #12–#17). P2: #18–#22 closed (PRs #23–#27).
 Blockers: none.
-Next action: P1 coordinator branch executes #5–#9; stop at the P1 gate.
-Decisions taken (2026-11-01, PO): one PR per issue, coordinator merges after independent review + green checks; model families kept as configured (worker sonnet-5.5 xhigh, reviewer gpt-6.1-sol medium; intended High recorded as deviation); A/B baseline model anthropic/claude-opus-5-5 medium.
-Decisions pending: none.
+Next action: Product Owner approves the P2 gate. Then P3 (EXP-01..06 native-feature trials) in a fresh coordinator branch.
+Decisions taken: P0 (PR per issue, coordinator merges; model families kept; A/B on anthropic opus-5-5). P0 gate: ADR-001/002 accepted, GitHub merge only, lander checks only and no push. P1 gate: ADR-002 clarifications 1–5 and the driving-chain limit accepted. Project `.ultimate/` setup trusted (2026-11-01).
+Decisions pending: P2 gate; the ADR-001 E2E start deviation (the test starts the API itself to kill and restart it).
 
-## P0 evidence
-- Environment and intended-vs-actual models: docs/ENVIRONMENT.md
-- Capability matrix: docs/CAPABILITY_MATRIX.md (6 PARTIAL, 3 UNVERIFIED, 0 PASS; the subagent per-run model override is NOT AVAILABLE)
-- Baseline EXP-00: experiments/EXP-00/SUMMARY.md (both 10/10 on the hidden suite; result confounded by model)
-- Memory probe: experiments/EXP-01/RUN-20261101-01.md (10/10, memory tool only; limited because the coordinator wrote both the memories and the questions)
-- Metrics: tools/metrics/ + experiments/EXP-00/instrumentation-check.md
-- P0 spend proxy: about $10.0 at list price, 14.4M tokens across 8 conversations (mostly cache reads). These are subscriptions, so the USD figure is not actual spend.
+## Evidence
+- P0: docs/ENVIRONMENT.md, docs/CAPABILITY_MATRIX.md, experiments/EXP-00, experiments/EXP-01/RUN-20261101-01.md
+- P1: experiments/P1/LOG.md (5 defects, lander refusal proof)
+- P2: experiments/P2/LOG.md (15 defects, all caught before merge; gate table; metrics), docs/screenshots/p2-*.png
+- Infrastructure: 5 Claude Code provider stops during P2 (one caused an ~8.5 h idle gap); recovered with no repeated effects.
 
 Important: This file is a resume summary only. GitHub Issues and PRs are the task source of truth.
