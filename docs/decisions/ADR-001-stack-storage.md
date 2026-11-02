@@ -82,6 +82,14 @@ assumed.
 - No prototype was built in P0 (no product code allowed); the atomic-rename and loopback claims are design intent,
   to be proven by the P1/P2 tests listed above.
 
+## Amendment 1 (2026-11-02, accepted by the Product Owner at the P2 gate)
+
+Implementation divergence, recorded without changing the agreed test objectives. Decision point 37 says "in the E2E
+test one npm script starts both". In P2 (#22, PR #27) the single command is still `npm run test:e2e`, but Playwright's
+`webServer` starts only Vite; the test starts the API itself as a child process, because it must kill and restart it to
+prove persistence across an app restart (US-07). The objectives are unchanged: edit, reload, restart, and the data is
+still persisted, run twice with a fresh store, and run by the lander. Evidence: experiments/P2/LOG.md, reviewer #6253/#6329.
+
 ## Review trigger
 
 Revisit when: data exceeds ~1 MB or ~1,000 tasks; a second concurrent writer or user is required; a dependency
