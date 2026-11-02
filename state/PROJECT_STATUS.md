@@ -4,9 +4,9 @@ Updated: 2026-11-02
 Current phase: **P3 IN PROGRESS** (P2 gate approved 2026-11-02; ADR-001 amendment 1 recorded).
 Current focus: P3 native-feature trials EXP-01..06, plus PO priorities (coordinator token analysis, Dream/memory/recovery value, infra vs agent failures, overhead reduction, CI proposal, UI concurrency limits).
 Last verified commit: `c7d1d9f` on main (PR #27). Fresh clone: `npm ci`, typecheck, 775 unit/integration tests, build and `npm run test:e2e` (2/2) all pass. The lander ran the E2E check on that landing.
-Active issues: none open. P1: #5–#9 closed (PRs #12–#17). P2: #18–#22 closed (PRs #23–#27).
+Active issues: P3 #31 (EXP-05 panel, draft PR #34 awaits PO approval) and #33 (EXP-06, EXP-01, Dream). #30 and #32 closed. P1: #5–#9 closed (PRs #12–#17). P2: #18–#22 closed (PRs #23–#27).
 Blockers: none.
-Next action: Product Owner approves the P2 gate. Then P3 (EXP-01..06 native-feature trials) in a fresh coordinator branch.
+Next action: finish the approved Dream improvement branches (#33), then present the P3 gate report. P4 does not start without PO approval.
 Decisions taken: P0 (PR per issue, coordinator merges; model families kept; A/B on anthropic opus-5-5). P0 gate: ADR-001/002 accepted, GitHub merge only, lander checks only and no push. P1 gate: ADR-002 clarifications 1–5 and the driving-chain limit accepted. Project `.ultimate/` setup trusted (2026-11-01).
 Decisions pending: EXP-01 questions from the PO ("later").
 
