@@ -54,7 +54,8 @@ npm run test:e2e    # Playwright (Chromium): load the sample, edit, save, reload
 ```
 
 The E2E test starts its own web server (port 5273) and API (port 5274) on a temporary data directory, so it needs
-neither `npm run server` nor `npm run dev` running and never touches `data/`.
+neither `npm run server` nor `npm run dev` running and never touches `data/`. For a second run at the same time, give it
+its own ports: `WEB_PORT=5373 API_PORT=5374 npm run test:e2e` (see `.ultimate/skills/rrl-e2e/SKILL.md`).
 
 ## Boundaries
 
