@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 // Both ports differ from `npm run dev` / `npm run server` (5173 / 5174), so a run never meets a dev setup that is up.
 export const WEB_PORT = 5273
-/** The API is not a `webServer`: each test starts it itself (a fresh data dir, restartable), see e2e/persist.spec.ts. */
+/** The API is not a `webServer`: each test starts it itself (a fresh data dir, restartable), see e2e/api.ts. */
 export const API_PORT = 5274
 
 export default defineConfig({
