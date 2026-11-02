@@ -42,7 +42,7 @@ first `pi` launch to the end of the review pass (`t0`..`t2` in `task-N/pi-meta.t
 
 **Coordinator share (excluded from the arms above):** #13171, all of EXP-07 and EXP-08 including task design,
 hidden suites, grading, cross-checks and these records, up to the cutoff in `ultimate-metrics.json`
-(2026-11-02T13:53:19Z): 97 model calls, 12.8M tokens (95 % cache reads), $9.36 list-price proxy (Opus 5.5 via
+(2026-11-02T13:53:19Z): 97 model calls, 12.8M tokens (93 % cache reads), $9.36 list-price proxy (Opus 5.5 via
 Claude Code, plus Sonnet usage the metrics attribute to subagent summaries). Work after the cutoff (review fixes,
 merge, closeout) is not counted. That is more than both arms together. It is
 experiment overhead; a normal issue coordinator does not write hidden suites or grade other arms, but it does
