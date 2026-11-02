@@ -158,6 +158,15 @@ describe('add', () => {
     expect(suggestId(draft, 'FW')).toBe('FW-01')
   })
 
+  // Regression (reviewer #5222): ids just below the boundary made the collision loop walk into unsafe numbers.
+  it('terminates with ids at the safe-integer boundary', () => {
+    const ids = ['FW-9007199254740990', 'FW-9007199254740991', 'FW-9007199254740992']
+    const draft = draftFrom({ ...base, tasks: ids.map((id) => ({ ...base.tasks[0]!, id, predecessors: [] })) })
+    const id = suggestId(draft, 'FW')
+    expect(ids).not.toContain(id)
+    expect(Number.isSafeInteger(Number(id.slice(3)))).toBe(true)
+  })
+
   it('a new task is valid once it has an id, and counts as added', () => {
     const { draft, key } = addTask(draftFrom(base), 'QA')
     expect(check(base, draft).ok).toBe(true)

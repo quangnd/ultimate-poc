@@ -38,9 +38,11 @@ interface Props {
   setDraft: (draft: Draft) => void
   /** Reloads the stored release after a save; resolves once the dashboard shows it. */
   onSaved: () => Promise<void>
+  /** The editor stays mounted on the dashboard (its save state must survive a view switch); ⌘S works only when shown. */
+  visible: boolean
 }
 
-export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved }: Props) {
+export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved, visible }: Props) {
   const [attempt, setAttempt] = useState<Attempt>({ kind: 'none' })
   const [newStream, setNewStream] = useState(base.workstreams[0] ?? '')
   const [focusKey, setFocusKey] = useState<number | undefined>()
@@ -93,6 +95,7 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
   const saveRef = useRef(save)
   saveRef.current = save
   useEffect(() => {
+    if (!visible) return
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -101,7 +104,7 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [visible])
 
   useEffect(() => {
     if (focusKey === undefined) return

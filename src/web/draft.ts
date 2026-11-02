@@ -121,18 +121,20 @@ export function suggestId(draft: Draft, stream: string): string {
     const match = t.stream === stream ? /^(.*?)(\d+)$/.exec(t.id) : null
     if (!match) continue
     const n = Number(match[2])
-    // Only safe integers can be incremented; a longer number would never advance (reviewer #5081).
-    if (!Number.isSafeInteger(n + 1)) continue
+    // Only suffixes well inside the safe-integer range are counted from (reviewers #5081, #5222).
+    if (!Number.isSafeInteger(n + draft.tasks.length + 1)) continue
     if (next === 1 || n >= next) {
       prefix = match[1]!
       width = match[2]!.length
       next = Math.max(next, n + 1)
     }
   }
-  let id: string
-  do id = `${prefix}${String(next++).padStart(width, '0')}`
-  while (taken.has(id))
-  return id
+  // At most tasks.length ids can be taken, so one of the next tasks.length + 1 candidates is free: bounded, always safe.
+  for (let i = 0; i <= draft.tasks.length; i++) {
+    const id = `${prefix}${String(next + i).padStart(width, '0')}`
+    if (!taken.has(id)) return id
+  }
+  throw new Error('unreachable: more candidates than tasks')
 }
 
 export function addTask(draft: Draft, stream: string): { draft: Draft; key: number } {

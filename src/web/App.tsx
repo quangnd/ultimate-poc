@@ -68,7 +68,10 @@ export function App() {
             <DashboardView dashboard={state.dashboard} />
           </>
         )}
-        {state.kind === 'ready' && view === 'edit' && draft && (
+        {/* Always mounted while a release is loaded, only hidden on the dashboard: the editor's save state (a save in
+            flight locks the draft) must survive switching views (reviewer #5222). */}
+        {state.kind === 'ready' && draft && (
+          <div hidden={view !== 'edit'}>
           <Editor
             base={state.dashboard.doc}
             baseForecast={state.dashboard.forecast}
@@ -76,7 +79,9 @@ export function App() {
             draft={draft}
             setDraft={setDraft}
             onSaved={reload}
+            visible={view === 'edit'}
           />
+          </div>
         )}
         {state.kind === 'empty' && (
           <Notice title="No release yet" tone="neutral">
