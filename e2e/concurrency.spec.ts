@@ -21,14 +21,18 @@ imported.tasks.find((t) => t.id === 'FW-03')!.estimateDays = 11
 
 /** What the page wrote (every non-GET call to the API, in order), so a test can say exactly which writes were sent. */
 const test = base.extend<{ writes: string[] }>({
-  writes: async ({ page }, use) => {
-    const writes: string[] = []
-    page.on('request', (request) => {
-      const { pathname } = new URL(request.url())
-      if (request.method() !== 'GET' && pathname.startsWith('/api/')) writes.push(`${request.method()} ${pathname}`)
-    })
-    await use(writes)
-  },
+  // Auto, so it listens from the start: before `beforeEach` navigates, not only from the first line of a test body.
+  writes: [
+    async ({ page }, use) => {
+      const writes: string[] = []
+      page.on('request', (request) => {
+        const { pathname } = new URL(request.url())
+        if (request.method() !== 'GET' && pathname.startsWith('/api/')) writes.push(`${request.method()} ${pathname}`)
+      })
+      await use(writes)
+    },
+    { auto: true },
+  ],
 })
 
 /** Holds the next `method` request to `path` until `release()`; `arrived` settles once it is in flight. */
