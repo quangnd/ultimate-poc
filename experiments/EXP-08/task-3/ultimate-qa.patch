@@ -1,0 +1,601 @@
+diff --git a/tests/qa/streams.qa.test.ts b/tests/qa/streams.qa.test.ts
+new file mode 100644
+index 0000000..4a36989
+--- /dev/null
++++ b/tests/qa/streams.qa.test.ts
+@@ -0,0 +1,595 @@
++/**
++ * Independent QA acceptance tests for EXP-08 task 3: `streamSummary(doc)` in src/domain/streams.ts.
++ *
++ * Black-box, written from the task's acceptance criteria (AC1..AC6), ADR-002 (§2, §5, §7), src/domain/types.ts,
++ * src/domain/schedule.ts and fixtures/release.json only. Every expected value for a hand-built document is derived
++ * by hand next to the document; the seeded random documents are checked against a test-side oracle that follows the
++ * AC text literally and takes the finish dates from the real `schedule()` (the scheduler must not be reimplemented).
++ *
++ * AC map:
++ *   AC1  one entry per workstream, in order, empty streams included      -> describe 'AC1'
++ *   AC2  counts keys / integers / total                                  -> describe 'AC2'
++ *   AC3  remainingDays                                                   -> describe 'AC3'
++ *   AC4  blocked (task level, any stream, code-unit sort, done tasks)    -> describe 'AC4'
++ *   AC5  forecastFinishDate (schedule(doc), day -1, null)                -> describe 'AC5'
++ *   AC6  purity: no I/O, clock, randomness, no mutation, order-free      -> describe 'AC6'
++ */
++import { readFileSync } from 'node:fs'
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { schedule } from '../../src/domain/schedule'
++import { streamSummary, type StreamSummary } from '../../src/domain/streams'
++import { GATES, STATUSES, type Gate, type ReleaseDocument, type Status, type Task } from '../../src/domain/types'
++import { validateDocument } from '../../src/domain/validate'
++
++// ---------------------------------------------------------------- helpers
++
++/** A valid document; a mistake in a QA fixture is reported as such, not as a failure of streamSummary. */
++function valid(doc: ReleaseDocument): ReleaseDocument {
++  const result = validateDocument(doc)
++  if (!result.ok) throw new Error(`QA fixture is invalid: ${JSON.stringify(result.errors)}`)
++  return doc
++}
++
++function task(id: string, stream: string, status: Status, estimateDays: number, predecessors: string[] = [], gate?: Gate): Task {
++  return {
++    id,
++    title: `Task ${id}`,
++    stream,
++    ownerRole: 'qa-role',
++    status,
++    estimateDays,
++    predecessors,
++    ...(gate === undefined ? {} : { gate }),
++  }
++}
++
++function docOf(workstreams: string[], tasks: Task[], startDate = '2026-01-05'): ReleaseDocument {
++  return valid({ schemaVersion: 1, release: { startDate }, workstreams, tasks })
++}
++
++function deepFreeze<T>(value: T): T {
++  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
++    Object.freeze(value)
++    for (const v of Object.values(value)) deepFreeze(v)
++  }
++  return value
++}
++
++/** Code-unit order, written out here so the oracle does not depend on the implementation's helper. */
++const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
++
++const summaryOf = (doc: ReleaseDocument, stream: string): StreamSummary => {
++  const found = streamSummary(doc).find((s) => s.stream === stream)
++  if (!found) throw new Error(`no summary for stream ${stream}`)
++  return found
++}
++
++function permute<T>(items: T[]): T[][] {
++  if (items.length <= 1) return [items.slice()]
++  return items.flatMap((item, i) => permute([...items.slice(0, i), ...items.slice(i + 1)]).map((p) => [item, ...p]))
++}
++
++const fixture = JSON.parse(readFileSync(new URL('../../fixtures/release.json', import.meta.url), 'utf8')) as ReleaseDocument
++
++// ---------------------------------------------------------------- the hand-derived document ("DOC_A")
++//
++// Day 0 = Monday 2026-01-05. Working-day dates: 0 Jan 5, 1 Jan 6, 2 Jan 7, 3 Jan 8, 4 Jan 9 (Fri), 5 Jan 12 (Mon);
++// day -1 = Fri 2026-01-02.
++//
++// Streams in this (non-alphabetical) order: Zeta, Alpha, Empty, Mid, Gates, Solo.
++//   Z1 Zeta  todo        2d []
++//   Z2 Zeta  in_progress 3d [Z1]
++//   A1 Alpha todo        1d [Z2]
++//   A2 Alpha todo        2d []
++//   A3 Alpha done        7d []
++//   M1 Mid   done        5d []
++//   M2 Mid   done        3d [M1]
++//   M3 Mid   done        4d [A1]      (a done task with an open predecessor in another stream)
++//   G1 Gates todo        0d [] gate qa-complete
++//   S1 Solo  todo        1d []
++//
++// Schedule (ADR-002 §5): done tasks finish on -1. Day-0 candidates A2, G1, S1, Z1 (ties by id): A2 0..1 (Alpha free
++// from 2); G1 is a 0-day gate: start 0, finish -1; S1 0..0; Z1 0..1. Z2: ready 2 -> 2..4. A1: ready 5 (after Z2's 4),
++// Alpha free from 2 -> 5..5.
++//   Zeta  latest finish 4  -> 2026-01-09          Alpha latest finish 5 -> 2026-01-12
++//   Mid   all done, -1     -> 2026-01-02          Gates latest finish -1 -> 2026-01-02 (a gate with no predecessor)
++//   Solo  latest finish 0  -> 2026-01-05          Empty has no tasks -> null
++// (A naive "sum of remaining days from day 0" would give Alpha day 2 instead of 5 and Mid/Gates day 0.)
++const DOC_A_STREAMS = ['Zeta', 'Alpha', 'Empty', 'Mid', 'Gates', 'Solo']
++const docATasks = (): Task[] => [
++  task('M3', 'Mid', 'done', 4, ['A1']),
++  task('A2', 'Alpha', 'todo', 2),
++  task('Z2', 'Zeta', 'in_progress', 3, ['Z1']),
++  task('S1', 'Solo', 'todo', 1),
++  task('A3', 'Alpha', 'done', 7),
++  task('M1', 'Mid', 'done', 5),
++  task('G1', 'Gates', 'todo', 0, [], 'qa-complete'),
++  task('Z1', 'Zeta', 'todo', 2),
++  task('A1', 'Alpha', 'todo', 1, ['Z2']),
++  task('M2', 'Mid', 'done', 3, ['M1']),
++]
++const docA = (startDate = '2026-01-05'): ReleaseDocument => docOf(DOC_A_STREAMS, docATasks(), startDate)
++
++const DOC_A_EXPECTED: StreamSummary[] = [
++  { stream: 'Zeta', counts: { todo: 1, in_progress: 1, done: 0 }, total: 2, remainingDays: 5, blocked: ['Z2'], forecastFinishDate: '2026-01-09' },
++  { stream: 'Alpha', counts: { todo: 2, in_progress: 0, done: 1 }, total: 3, remainingDays: 3, blocked: ['A1'], forecastFinishDate: '2026-01-12' },
++  { stream: 'Empty', counts: { todo: 0, in_progress: 0, done: 0 }, total: 0, remainingDays: 0, blocked: [], forecastFinishDate: null },
++  { stream: 'Mid', counts: { todo: 0, in_progress: 0, done: 3 }, total: 3, remainingDays: 0, blocked: ['M3'], forecastFinishDate: '2026-01-02' },
++  { stream: 'Gates', counts: { todo: 1, in_progress: 0, done: 0 }, total: 1, remainingDays: 0, blocked: [], forecastFinishDate: '2026-01-02' },
++  { stream: 'Solo', counts: { todo: 1, in_progress: 0, done: 0 }, total: 1, remainingDays: 1, blocked: [], forecastFinishDate: '2026-01-05' },
++]
++
++// ---------------------------------------------------------------- the fixture, by hand
++//
++// fixtures/release.json (day 0 = Mon 2027-01-04; hand derivation of the finishes is in tests/qa/readiness.qa.test.ts):
++//   FW   6 tasks: FW-01 done, FW-02 in_progress, FW-03..06 todo; remaining 3+5+4+2+0 = 14; fin 13 -> 2027-01-21
++//        blocked: FW-03, FW-04, FW-05, FW-06 (FW-02's only predecessor FW-01 is done)
++//   SPS  4 tasks: 1 done, 1 in_progress, 2 todo; remaining 3+4+3 = 10; fin 14 -> 2027-01-22; blocked SPS-03, SPS-04
++//   Security 5: 1 done, 1 in_progress, 3 todo; remaining 3+4+5+0 = 12; fin 22 -> 2027-02-03; blocked SEC-03..05
++//   App  5 tasks: 1 done, 1 in_progress, 3 todo; remaining 6+3+4+0 = 13; fin 16 -> 2027-01-26; blocked APP-03..05
++//   QA   4 tasks: 0 done, 1 in_progress, 3 todo; remaining 3+4+5+0 = 12; fin 27 -> 2027-02-10; blocked QA-02..04
++//        (QA-01 has no predecessor, so the in_progress task of the stream is not blocked)
++const FIXTURE_EXPECTED: StreamSummary[] = [
++  { stream: 'FW', counts: { todo: 4, in_progress: 1, done: 1 }, total: 6, remainingDays: 14, blocked: ['FW-03', 'FW-04', 'FW-05', 'FW-06'], forecastFinishDate: '2027-01-21' },
++  { stream: 'SPS', counts: { todo: 2, in_progress: 1, done: 1 }, total: 4, remainingDays: 10, blocked: ['SPS-03', 'SPS-04'], forecastFinishDate: '2027-01-22' },
++  { stream: 'Security', counts: { todo: 3, in_progress: 1, done: 1 }, total: 5, remainingDays: 12, blocked: ['SEC-03', 'SEC-04', 'SEC-05'], forecastFinishDate: '2027-02-03' },
++  { stream: 'App', counts: { todo: 3, in_progress: 1, done: 1 }, total: 5, remainingDays: 13, blocked: ['APP-03', 'APP-04', 'APP-05'], forecastFinishDate: '2027-01-26' },
++  { stream: 'QA', counts: { todo: 3, in_progress: 1, done: 0 }, total: 4, remainingDays: 12, blocked: ['QA-02', 'QA-03', 'QA-04'], forecastFinishDate: '2027-02-10' },
++]
++
++// ---------------------------------------------------------------- seeded random documents and an oracle
++
++/** mulberry32: a small deterministic PRNG, so the documents are the same on every run. */
++function prng(seed: number): () => number {
++  let a = seed >>> 0
++  return () => {
++    a = (a + 0x6d2b79f5) >>> 0
++    let t = a
++    t = Math.imul(t ^ (t >>> 15), t | 1)
++    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
++    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
++  }
++}
++
++const RANDOM_STREAMS = ['FW', 'SPS', 'Idle', 'App', 'QA']
++const START_DATES = ['2026-01-05', '2026-01-07', '2026-01-09', '2026-01-10', '2026-01-11', '2026-03-02']
++
++function randomDocument(seed: number): ReleaseDocument {
++  const rnd = prng(seed)
++  const int = (lo: number, hi: number): number => lo + Math.floor(rnd() * (hi - lo + 1))
++  const n = int(0, 14)
++  const prefixes = ['T', 'a', 'Z', '_', 'b', 'B']
++  const usable = RANDOM_STREAMS.filter((s) => s !== 'Idle') // 'Idle' never gets a task
++  let gatesUsed = 0
++  const ids: string[] = []
++  const tasks: Task[] = []
++  for (let i = 0; i < n; i++) {
++    const id = `${prefixes[int(0, prefixes.length - 1)]}${int(0, 9)}${String.fromCharCode(97 + i)}`
++    const predecessors = ids.filter(() => rnd() < 0.3)
++    const kind = rnd()
++    let status: Status = 'todo'
++    let estimate = int(1, 6)
++    let gate: Gate | undefined
++    if (kind < 0.12 && gatesUsed < GATES.length) {
++      gate = GATES[gatesUsed]
++      gatesUsed++
++      estimate = 0
++    } else if (kind < 0.4) {
++      status = 'done'
++    } else if (kind < 0.6) {
++      status = 'in_progress'
++    }
++    ids.push(id)
++    tasks.push(task(id, usable[int(0, usable.length - 1)] as string, status, estimate, predecessors, gate))
++  }
++  return docOf(RANDOM_STREAMS, tasks, START_DATES[int(0, START_DATES.length - 1)] as string)
++}
++
++/** The AC text, literally; finish dates come from the real scheduler. */
++function oracle(doc: ReleaseDocument): StreamSummary[] {
++  const forecast = schedule(doc)
++  const finishOf = new Map(forecast.tasks.map((s) => [s.id, s]))
++  const statusOf = new Map(doc.tasks.map((t) => [t.id, t.status]))
++  return doc.workstreams.map((stream) => {
++    const mine = doc.tasks.filter((t) => t.stream === stream)
++    const counts: Record<Status, number> = { todo: 0, in_progress: 0, done: 0 }
++    for (const t of mine) counts[t.status]++
++    const latest = mine.map((t) => finishOf.get(t.id)!).reduce<{ finish: number; finishDate: string } | undefined>(
++      (best, s) => (best === undefined || s.finish > best.finish ? s : best),
++      undefined,
++    )
++    return {
++      stream,
++      counts,
++      total: mine.length,
++      remainingDays: mine.filter((t) => t.status !== 'done').reduce((sum, t) => sum + t.estimateDays, 0),
++      blocked: mine.filter((t) => t.predecessors.some((p) => statusOf.get(p) !== 'done')).map((t) => t.id).sort(byCodeUnit),
++      forecastFinishDate: latest === undefined ? null : latest.finishDate,
++    }
++  })
++}
++
++// ================================================================= AC1
++
++describe('AC1: one entry per workstream, in order, empty streams included', () => {
++  it('lists the streams of doc.workstreams in that order (not alphabetical, not first-use order)', () => {
++    expect(streamSummary(docA()).map((s) => s.stream)).toEqual(DOC_A_STREAMS)
++    const reversed = docOf(['QA', 'FW', 'App'], [task('F1', 'FW', 'todo', 1), task('A1', 'App', 'todo', 1), task('Q1', 'QA', 'todo', 1)])
++    expect(streamSummary(reversed).map((s) => s.stream)).toEqual(['QA', 'FW', 'App'])
++  })
++
++  it('has exactly one entry per workstream', () => {
++    const summary = streamSummary(docA())
++    expect(summary).toHaveLength(DOC_A_STREAMS.length)
++    expect(new Set(summary.map((s) => s.stream)).size).toBe(DOC_A_STREAMS.length)
++  })
++
++  it('includes a stream with no tasks, with zero counts, total 0, no remaining days, nothing blocked', () => {
++    const empty = summaryOf(docA(), 'Empty')
++    expect(empty.counts).toStrictEqual({ todo: 0, in_progress: 0, done: 0 })
++    expect(empty.total).toBe(0)
++    expect(empty.remainingDays).toBe(0)
++    expect(empty.blocked).toStrictEqual([])
++  })
++
++  it('a document without tasks gives one empty entry per workstream; without workstreams gives no entries', () => {
++    const none = streamSummary(docOf(['B', 'A'], []))
++    expect(none.map((s) => s.stream)).toEqual(['B', 'A'])
++    for (const s of none) {
++      expect(s).toStrictEqual({
++        stream: s.stream,
++        counts: { todo: 0, in_progress: 0, done: 0 },
++        total: 0,
++        remainingDays: 0,
++        blocked: [],
++        forecastFinishDate: null,
++      })
++    }
++    expect(streamSummary(docOf([], []))).toStrictEqual([])
++  })
++
++  it('the whole summary of the hand-derived document matches, entry by entry', () => {
++    expect(streamSummary(docA())).toStrictEqual(DOC_A_EXPECTED)
++  })
++})
++
++// ================================================================= AC2
++
++describe('AC2: counts', () => {
++  it('has exactly the keys todo, in_progress and done, each a non-negative integer, also for an empty stream', () => {
++    for (const s of streamSummary(docA())) {
++      expect(Object.keys(s.counts).sort(), s.stream).toEqual([...STATUSES].sort())
++      for (const status of STATUSES) {
++        expect(Number.isInteger(s.counts[status]), `${s.stream} ${status}`).toBe(true)
++        expect(s.counts[status], `${s.stream} ${status}`).toBeGreaterThanOrEqual(0)
++      }
++    }
++  })
++
++  it('counts each status separately (hand-derived document)', () => {
++    expect(summaryOf(docA(), 'Zeta').counts).toStrictEqual({ todo: 1, in_progress: 1, done: 0 })
++    expect(summaryOf(docA(), 'Alpha').counts).toStrictEqual({ todo: 2, in_progress: 0, done: 1 })
++    expect(summaryOf(docA(), 'Mid').counts).toStrictEqual({ todo: 0, in_progress: 0, done: 3 })
++  })
++
++  it('counts only the stream’s own tasks (other streams’ tasks do not leak in)', () => {
++    const doc = docOf(['A', 'B'], [task('a1', 'A', 'done', 1), task('b1', 'B', 'todo', 1), task('b2', 'B', 'todo', 1), task('b3', 'B', 'in_progress', 1)])
++    expect(summaryOf(doc, 'A').counts).toStrictEqual({ todo: 0, in_progress: 0, done: 1 })
++    expect(summaryOf(doc, 'B').counts).toStrictEqual({ todo: 2, in_progress: 1, done: 0 })
++  })
++
++  it('total is the sum of the three counts, for every stream of the fixture and of 150 random documents', () => {
++    const check = (doc: ReleaseDocument, label: string) => {
++      for (const s of streamSummary(doc)) {
++        expect(s.total, `${label} ${s.stream}`).toBe(s.counts.todo + s.counts.in_progress + s.counts.done)
++        expect(s.total, `${label} ${s.stream}`).toBe(doc.tasks.filter((t) => t.stream === s.stream).length)
++      }
++    }
++    check(fixture, 'fixture')
++    for (let seed = 1; seed <= 150; seed++) check(randomDocument(seed), `seed ${seed}`)
++  })
++})
++
++// ================================================================= AC3
++
++describe('AC3: remainingDays', () => {
++  it('sums estimateDays of todo and in_progress tasks and ignores done tasks (A3 is done with 7 days)', () => {
++    expect(summaryOf(docA(), 'Zeta').remainingDays).toBe(5) // Z1 2 + Z2 3
++    expect(summaryOf(docA(), 'Alpha').remainingDays).toBe(3) // A1 1 + A2 2, not A3's 7
++  })
++
++  it('is 0 for a stream whose tasks are all done and for a stream without tasks', () => {
++    expect(summaryOf(docA(), 'Mid').remainingDays).toBe(0) // done 5 + 3 + 4 days
++    expect(summaryOf(docA(), 'Empty').remainingDays).toBe(0)
++  })
++
++  it('0-day gate tasks add nothing; an in_progress task counts its full estimate', () => {
++    expect(summaryOf(docA(), 'Gates').remainingDays).toBe(0)
++    const doc = docOf(['A'], [task('a1', 'A', 'in_progress', 9), task('a2', 'A', 'todo', 4, ['a1']), task('a3', 'A', 'todo', 0, ['a2'], 'qa-complete')])
++    expect(summaryOf(doc, 'A').remainingDays).toBe(13)
++  })
++
++  it('matches the fixture by hand: FW 14, SPS 10, Security 12, App 13, QA 12', () => {
++    expect(streamSummary(fixture).map((s) => [s.stream, s.remainingDays])).toEqual([
++      ['FW', 14],
++      ['SPS', 10],
++      ['Security', 12],
++      ['App', 13],
++      ['QA', 12],
++    ])
++  })
++})
++
++// ================================================================= AC4
++
++describe('AC4: blocked (ADR-002 §7, task level)', () => {
++  it('lists a task whose direct predecessor, in the same or another stream, is todo or in_progress', () => {
++    expect(summaryOf(docA(), 'Zeta').blocked).toStrictEqual(['Z2']) // Z2 <- Z1 (todo, same stream)
++    expect(summaryOf(docA(), 'Alpha').blocked).toStrictEqual(['A1']) // A1 <- Z2 (in_progress, other stream)
++    const doc = docOf(['A', 'B'], [task('a1', 'A', 'in_progress', 2), task('b1', 'B', 'todo', 1, ['a1'])])
++    expect(summaryOf(doc, 'B').blocked).toStrictEqual(['b1'])
++    expect(summaryOf(doc, 'A').blocked).toStrictEqual([]) // a1 has no predecessor: the stream of the blocker is not blocked
++  })
++
++  it('does not list a task whose direct predecessors are all done, nor a task without predecessors', () => {
++    const doc = docOf(['A', 'B'], [task('a1', 'A', 'done', 2), task('a2', 'A', 'todo', 1, ['a1']), task('b1', 'B', 'todo', 1, ['a1', 'a2']), task('b2', 'B', 'todo', 1)])
++    expect(summaryOf(doc, 'A').blocked).toStrictEqual([])
++    expect(summaryOf(doc, 'B').blocked).toStrictEqual(['b1']) // a2 is open
++    expect(summaryOf(docA(), 'Solo').blocked).toStrictEqual([])
++  })
++
++  it('only direct predecessors count: a task behind a done task whose own predecessor is open is not listed', () => {
++    // c1 todo <- c2 done <- c3 todo: c3's only direct predecessor c2 is done, so c3 is not blocked at task level;
++    // c2 is done with an open predecessor c1 and is listed.
++    const doc = docOf(['C'], [task('c1', 'C', 'todo', 1), task('c2', 'C', 'done', 1, ['c1']), task('c3', 'C', 'todo', 1, ['c2'])])
++    expect(summaryOf(doc, 'C').blocked).toStrictEqual(['c2'])
++  })
++
++  it('a task with several open predecessors is listed once', () => {
++    const doc = docOf(['A', 'B'], [task('a1', 'A', 'todo', 1), task('a2', 'A', 'in_progress', 1), task('b1', 'B', 'todo', 1, ['a1', 'a2'])])
++    expect(summaryOf(doc, 'B').blocked).toStrictEqual(['b1'])
++  })
++
++  it('lists a done task that has an open predecessor (also in another stream)', () => {
++    expect(summaryOf(docA(), 'Mid').blocked).toStrictEqual(['M3']) // M3 done <- A1 (todo, Alpha); M2 <- M1 done is not listed
++    const doc = docOf(['A'], [task('a1', 'A', 'todo', 1), task('a2', 'A', 'done', 1, ['a1'])])
++    expect(summaryOf(doc, 'A').blocked).toStrictEqual(['a2'])
++  })
++
++  it('lists only the stream’s own tasks, never the tasks it blocks elsewhere', () => {
++    const doc = docOf(['A', 'B'], [task('a1', 'A', 'todo', 3), task('b1', 'B', 'todo', 1, ['a1']), task('b2', 'B', 'todo', 1, ['b1'])])
++    expect(summaryOf(doc, 'A').blocked).toStrictEqual([])
++    expect(summaryOf(doc, 'B').blocked).toStrictEqual(['b1', 'b2'])
++  })
++
++  // Code-unit order: 'A1' (65) < 'B1' (66) < 'Z1' (90) < '_1' (95) < 'a1' (97) < 'a10' < 'a2' < 'b1' < 'é1' (233).
++  // localeCompare would give _1, a1, a10, a2, A1, b1, B1, é1, Z1 (or similar) and fail.
++  const SORT_IDS = ['b1', 'a2', 'A1', 'é1', '_1', 'a10', 'Z1', 'a1', 'B1']
++  const SORT_EXPECTED = ['A1', 'B1', 'Z1', '_1', 'a1', 'a10', 'a2', 'b1', 'é1']
++  const sortDoc = (order: string[], reversePreds = false): ReleaseDocument => {
++    const preds = reversePreds ? ['P1', 'P0'] : ['P0', 'P1']
++    return docOf(
++      ['S', 'P'],
++      [
++        ...order.map((id) => task(id, 'S', 'todo', 1, preds)),
++        task('P0', 'P', 'todo', 1),
++        task('P1', 'P', 'in_progress', 1),
++        task('Sok', 'S', 'todo', 1, ['D0']),
++        task('D0', 'P', 'done', 1),
++      ],
++    )
++  }
++
++  it('sorts by id in code-unit order, not with localeCompare', () => {
++    expect(summaryOf(sortDoc(SORT_IDS), 'S').blocked).toStrictEqual(SORT_EXPECTED)
++    expect(SORT_EXPECTED).toStrictEqual([...SORT_IDS].sort()) // the expectation is the default (code-unit) sort
++    expect(SORT_EXPECTED).not.toStrictEqual([...SORT_IDS].sort((a, b) => a.localeCompare(b))) // and differs from localeCompare
++  })
++
++  it('the sorted result does not depend on the order of the tasks or of the predecessors in the document', () => {
++    expect(summaryOf(sortDoc([...SORT_IDS].reverse()), 'S').blocked).toStrictEqual(SORT_EXPECTED)
++    expect(summaryOf(sortDoc([...SORT_EXPECTED], true), 'S').blocked).toStrictEqual(SORT_EXPECTED)
++    expect(summaryOf(sortDoc([...SORT_IDS].sort((a, b) => a.localeCompare(b))), 'S').blocked).toStrictEqual(SORT_EXPECTED)
++  })
++
++  it('matches the fixture by hand', () => {
++    expect(streamSummary(fixture).map((s) => [s.stream, s.blocked])).toEqual(FIXTURE_EXPECTED.map((s) => [s.stream, s.blocked]))
++  })
++})
++
++// ================================================================= AC5
++
++describe('AC5: forecastFinishDate', () => {
++  it('is the latest finishDate of the stream’s tasks in schedule(doc), by hand (capacity and cross-stream waits)', () => {
++    expect(summaryOf(docA(), 'Zeta').forecastFinishDate).toBe('2026-01-09') // Z2 2..4
++    expect(summaryOf(docA(), 'Alpha').forecastFinishDate).toBe('2026-01-12') // A1 waits for Z2: day 5, not day 2
++    expect(summaryOf(docA(), 'Solo').forecastFinishDate).toBe('2026-01-05') // a 1-day task on day 0 finishes on day 0
++  })
++
++  it('takes the latest finish of the stream, not the release finish and not the task that is first, last or smallest by id', () => {
++    const doc = docA()
++    expect(schedule(doc).finishDate).toBe('2026-01-12')
++    expect(summaryOf(doc, 'Zeta').forecastFinishDate).toBe('2026-01-09') // the release finishes later than Zeta
++    // b1 (stream B, 3d) 0..2; z1 (A, 1d, no predecessor) 0..0; a1 (A, 1d) waits for b1: ready 3 -> 3..3.
++    // Stream A finishes with a1 on day 3 = Thu 2026-01-08, whichever of a1/z1 comes first in the document.
++    const tasks = [task('b1', 'B', 'todo', 3), task('a1', 'A', 'todo', 1, ['b1']), task('z1', 'A', 'todo', 1)]
++    expect(summaryOf(docOf(['A', 'B'], tasks), 'A').forecastFinishDate).toBe('2026-01-08')
++    expect(summaryOf(docOf(['A', 'B'], [...tasks].reverse()), 'A').forecastFinishDate).toBe('2026-01-08')
++    expect(summaryOf(docOf(['A', 'B'], tasks), 'B').forecastFinishDate).toBe('2026-01-07') // b1 0..2
++  })
++
++  it('a stream whose tasks are all done gets the finish date of day -1, the working day before day 0 (not null, not day 0)', () => {
++    expect(summaryOf(docA(), 'Mid').forecastFinishDate).toBe('2026-01-02') // day 0 = Mon 2026-01-05, day -1 = Fri 2026-01-02
++  })
++
++  it('day -1 is the working day before day 0 when the start date is a weekend (Sat 2026-01-10, Sun 2026-01-11)', () => {
++    // day 0 = Mon 2026-01-12; day -1 = Fri 2026-01-09 (not Sun 2026-01-11)
++    for (const start of ['2026-01-10', '2026-01-11']) {
++      const s = streamSummary(docA(start))
++      expect(s.find((x) => x.stream === 'Mid')?.forecastFinishDate, start).toBe('2026-01-09')
++      expect(s.find((x) => x.stream === 'Gates')?.forecastFinishDate, start).toBe('2026-01-09')
++      expect(s.find((x) => x.stream === 'Solo')?.forecastFinishDate, start).toBe('2026-01-12')
++      expect(s.find((x) => x.stream === 'Zeta')?.forecastFinishDate, start).toBe('2026-01-16')
++      expect(s.find((x) => x.stream === 'Alpha')?.forecastFinishDate, start).toBe('2026-01-19')
++    }
++  })
++
++  it('a stream with only an open 0-day gate without predecessors is day -1 as the scheduler reports it, not null', () => {
++    expect(summaryOf(docA(), 'Gates').forecastFinishDate).toBe('2026-01-02')
++    expect(schedule(docA()).tasks.find((t) => t.id === 'G1')?.finishDate).toBe('2026-01-02')
++  })
++
++  it('a stream without tasks gets null (not undefined, not a date)', () => {
++    expect(summaryOf(docA(), 'Empty').forecastFinishDate).toBeNull()
++    expect(streamSummary(docOf(['X'], []))[0]?.forecastFinishDate).toBeNull()
++  })
++
++  it('the fixture streams finish on the hand-derived dates; the latest stream is the release finish', () => {
++    const summary = streamSummary(fixture)
++    expect(summary.map((s) => [s.stream, s.forecastFinishDate])).toEqual(FIXTURE_EXPECTED.map((s) => [s.stream, s.forecastFinishDate]))
++    expect(Math.max(...summary.map((s) => Date.parse(s.forecastFinishDate as string)))).toBe(Date.parse(schedule(fixture).finishDate))
++  })
++
++  it('follows the scheduler when an estimate changes: FW-03 = 8 days moves every stream finish (hand-derived)', () => {
++    // FW-03 3..10, FW-04 11..14, FW-05 15..16, FW-06 fin 16 -> FW 2027-01-26; SPS-04 15..17 -> 2027-01-27;
++    // SEC-03 17..20, SEC-04 21..25 -> Security 2027-02-08; APP-03 17..19 -> App 2027-01-29; QA-03 26..30 -> QA 2027-02-15.
++    const delayed: ReleaseDocument = { ...fixture, tasks: fixture.tasks.map((t) => (t.id === 'FW-03' ? { ...t, estimateDays: 8 } : t)) }
++    expect(valid(delayed)).toBe(delayed)
++    const summary = streamSummary(delayed)
++    expect(summary.map((s) => [s.stream, s.forecastFinishDate])).toEqual([
++      ['FW', '2027-01-26'],
++      ['SPS', '2027-01-27'],
++      ['Security', '2027-02-08'],
++      ['App', '2027-01-29'],
++      ['QA', '2027-02-15'],
++    ])
++    expect(summary[0]?.remainingDays).toBe(17) // FW: 14 + 3 more days
++  })
++
++  it('agrees with the finish dates of schedule() on 150 random documents (a private reimplementation would drift)', () => {
++    for (let seed = 1; seed <= 150; seed++) {
++      const doc = randomDocument(seed)
++      const expected = oracle(doc).map((s) => s.forecastFinishDate)
++      expect(streamSummary(doc).map((s) => s.forecastFinishDate), `seed ${seed}`).toStrictEqual(expected)
++    }
++  })
++})
++
++// ================================================================= whole-result checks (all ACs together)
++
++describe('whole result', () => {
++  it('has exactly the documented shape for the fixture (hand-derived)', () => {
++    expect(streamSummary(fixture)).toStrictEqual(FIXTURE_EXPECTED)
++  })
++
++  it('agrees with the literal-AC oracle on 150 seeded random documents (0..14 tasks, weekend starts, empty and done-only streams)', () => {
++    for (let seed = 1; seed <= 150; seed++) {
++      const doc = randomDocument(seed)
++      expect(streamSummary(doc), `seed ${seed}`).toStrictEqual(oracle(doc))
++    }
++  })
++})
++
++// ================================================================= AC6
++
++describe('AC6: pure, no mutation, order-independent', () => {
++  afterEach(() => {
++    vi.useRealTimers()
++    vi.restoreAllMocks()
++  })
++
++  it('does not modify the document: a deeply frozen document works and is unchanged', () => {
++    const frozen = deepFreeze(docA())
++    const before = JSON.stringify(frozen)
++    expect(streamSummary(frozen)).toStrictEqual(DOC_A_EXPECTED)
++    expect(JSON.stringify(frozen)).toBe(before)
++    const frozenFixture = deepFreeze(structuredClone(fixture))
++    expect(streamSummary(frozenFixture)).toStrictEqual(FIXTURE_EXPECTED)
++  })
++
++  it('does not modify an unfrozen document either (no in-place sort of tasks or predecessor lists)', () => {
++    const doc = docOf(
++      ['S', 'P'],
++      [task('z', 'S', 'todo', 1, ['y', 'x']), task('y', 'P', 'todo', 1), task('x', 'P', 'done', 1), task('a', 'S', 'todo', 1, ['z', 'y'])],
++    )
++    const before = JSON.stringify(doc)
++    streamSummary(doc)
++    expect(JSON.stringify(doc)).toBe(before)
++    expect(doc.tasks.map((t) => t.id)).toEqual(['z', 'y', 'x', 'a'])
++    expect(doc.workstreams).toEqual(['S', 'P'])
++  })
++
++  it('gives the same result on every call and shares no state between calls (changing a result does not change the next)', () => {
++    const doc = docA()
++    const first = streamSummary(doc)
++    const second = streamSummary(doc)
++    expect(second).toStrictEqual(first)
++    for (const s of first) {
++      s.blocked.push('X')
++      s.counts.todo += 100
++      s.remainingDays += 100
++      s.stream += '!'
++    }
++    first.pop()
++    expect(streamSummary(doc)).toStrictEqual(DOC_A_EXPECTED)
++  })
++
++  it('does not depend on the clock or on randomness', () => {
++    vi.spyOn(Math, 'random').mockImplementation(() => {
++      throw new Error('streamSummary must not use Math.random')
++    })
++    const results = ['2001-01-01T00:00:00Z', '2026-01-10T12:00:00Z', '2099-12-31T23:59:59Z'].map((now) => {
++      vi.useFakeTimers()
++      vi.setSystemTime(new Date(now))
++      const json = JSON.stringify(streamSummary(docA()))
++      vi.useRealTimers()
++      return json
++    })
++    expect(new Set(results).size).toBe(1)
++    expect(JSON.parse(results[0] as string)).toStrictEqual(DOC_A_EXPECTED)
++  })
++
++  it('does no network access', () => {
++    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
++      throw new Error('streamSummary must not call fetch')
++    })
++    streamSummary(docA())
++    expect(fetchSpy).not.toHaveBeenCalled()
++  })
++
++  it('imports only sibling modules of the domain (no node: builtins, no packages: no file or network I/O)', () => {
++    const source = readFileSync(new URL('../../src/domain/streams.ts', import.meta.url), 'utf8')
++    const specifiers = [...source.matchAll(/(?:from|import\s*\(|require\s*\()\s*['"]([^'"]+)['"]/g)].map((m) => m[1] as string)
++    for (const specifier of specifiers) expect(specifier, specifier).toMatch(/^\.\.?\//)
++  })
++
++  it('does not depend on the order of the tasks or of the predecessors: shuffled variants of 150 random documents', () => {
++    for (let seed = 1; seed <= 150; seed++) {
++      const doc = randomDocument(seed)
++      const baseline = streamSummary(doc)
++      const tasks = doc.tasks
++      const variants: Task[][] = [
++        [...tasks].reverse(),
++        [...tasks.slice(3), ...tasks.slice(0, 3)],
++        [...tasks.filter((_, i) => i % 2 === 0), ...tasks.filter((_, i) => i % 2 === 1)].reverse(),
++        [...tasks].reverse().map((t) => ({ ...t, predecessors: [...t.predecessors].reverse() })),
++        [...tasks].sort((a, b) => a.id.localeCompare(b.id)).map((t) => ({ ...t, predecessors: [...t.predecessors].sort((x, y) => y.localeCompare(x)) })),
++      ]
++      for (const [i, variant] of variants.entries()) {
++        expect(streamSummary(valid({ ...doc, tasks: variant })), `seed ${seed} variant ${i}`).toStrictEqual(baseline)
++      }
++    }
++  })
++
++  it('shuffling the hand-derived document (all 720 orders of six chosen tasks) gives the same summary', () => {
++    const base = docATasks()
++    const head = base.slice(0, 6)
++    const tail = base.slice(6)
++    let checked = 0
++    for (const order of permute(head)) {
++      expect(streamSummary(valid({ ...docA(), tasks: [...order, ...tail] }))).toStrictEqual(DOC_A_EXPECTED)
++      checked++
++    }
++    expect(checked).toBe(720)
++  })
++})

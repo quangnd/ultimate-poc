@@ -1,0 +1,179 @@
+diff --git a/src/domain/streams.ts b/src/domain/streams.ts
+new file mode 100644
+index 0000000..72a6ab4
+--- /dev/null
++++ b/src/domain/streams.ts
+@@ -0,0 +1,54 @@
++/**
++ * Per-stream summary for the dashboard (PRD US-06; ADR-002 §2, §5, §7). Pure: no I/O, no clock, no randomness.
++ * Precondition, not re-checked: the document passed validateDocument (known predecessor ids, tasks in known streams).
++ */
++import { schedule } from './schedule'
++import { STATUSES, type IsoDate, type ReleaseDocument, type Status } from './types'
++
++export interface StreamSummary {
++  stream: string
++  /** number of the stream's tasks per status; every status key is present, 0 when none */
++  counts: Record<Status, number>
++  total: number
++  /** sum of estimateDays over the stream's tasks that are not 'done' */
++  remainingDays: number
++  /** ids of the stream's tasks (any status) with at least one direct predecessor that is not 'done', sorted by id */
++  blocked: string[]
++  /** latest forecast finishDate among the stream's tasks in schedule(doc); null when the stream has no tasks */
++  forecastFinishDate: IsoDate | null
++}
++
++/** Code-unit order (not localeCompare), so the result does not depend on the runtime's locale. */
++function compareIds(a: string, b: string): number {
++  return a < b ? -1 : a > b ? 1 : 0
++}
++
++export function streamSummary(doc: ReleaseDocument): StreamSummary[] {
++  const statusOf = new Map(doc.tasks.map((t) => [t.id, t.status]))
++  const slots = new Map(schedule(doc).tasks.map((t) => [t.id, t]))
++
++  // One entry per workstreams element, in that order (a repeated name keeps both positions).
++  return doc.workstreams.map((stream) => {
++    const tasks = doc.tasks.filter((t) => t.stream === stream)
++    const counts = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<Status, number>
++    for (const t of tasks) counts[t.status] += 1
++
++    const blocked = tasks
++      .filter((t) => t.predecessors.some((id) => statusOf.get(id) !== 'done'))
++      .map((t) => t.id)
++      .sort(compareIds)
++
++    // The scheduler's own latest finish; ISO dates compare in calendar order as strings.
++    const finishDates = tasks.map((t) => slots.get(t.id)!.finishDate)
++    const forecastFinishDate = finishDates.length === 0 ? null : finishDates.reduce((a, b) => (b > a ? b : a))
++
++    return {
++      stream,
++      counts,
++      total: tasks.length,
++      remainingDays: tasks.filter((t) => t.status !== 'done').reduce((sum, t) => sum + t.estimateDays, 0),
++      blocked,
++      forecastFinishDate,
++    }
++  })
++}
+diff --git a/tests/domain/streams.test.ts b/tests/domain/streams.test.ts
+new file mode 100644
+index 0000000..e4b359e
+--- /dev/null
++++ b/tests/domain/streams.test.ts
+@@ -0,0 +1,113 @@
++import { describe, expect, it } from 'vitest'
++import { streamSummary } from '../../src/domain/streams'
++import type { ReleaseDocument, Status, Task } from '../../src/domain/types'
++
++// Hand computation with day0 = Mon 2026-01-05: day 0 Mon 01-05, 1 Tue 01-06, 2 Wed 01-07, 3 Thu 01-08, 4 Fri 01-09,
++// 5 Mon 01-12, 6 Tue 01-13. A done task finishes on day -1, the working day before day 0: Fri 2026-01-02.
++
++const START = '2026-01-05'
++const DAY_BEFORE_START = '2026-01-02'
++
++function task(id: string, stream: string, estimateDays: number, predecessors: string[] = [], status: Status = 'todo'): Task {
++  return { id, title: id, stream, ownerRole: 'owner', status, estimateDays, predecessors }
++}
++
++function doc(tasks: Task[], workstreams = ['FW', 'SPS', 'Security', 'App', 'QA']): ReleaseDocument {
++  return { schemaVersion: 1, release: { startDate: START }, workstreams, tasks }
++}
++
++/** FW: A [0,1], B [2,4], D done. App: C [5,6] after B, E done, F done after C (inconsistent). SPS: G [0,0]. */
++const sample = (): ReleaseDocument =>
++  doc([
++    task('A', 'FW', 2),
++    task('B', 'FW', 3, ['A'], 'in_progress'),
++    task('D', 'FW', 4, [], 'done'),
++    task('C', 'App', 2, ['B']),
++    task('E', 'App', 1, [], 'done'),
++    task('F', 'App', 1, ['C'], 'done'),
++    task('G', 'SPS', 1),
++  ])
++
++describe('streamSummary', () => {
++  it('gives one entry per workstream in workstream order, also for streams without tasks', () => {
++    const summary = streamSummary(sample())
++    expect(summary.map((s) => s.stream)).toEqual(['FW', 'SPS', 'Security', 'App', 'QA'])
++    expect(summary[2]).toEqual({
++      stream: 'Security',
++      counts: { todo: 0, in_progress: 0, done: 0 },
++      total: 0,
++      remainingDays: 0,
++      blocked: [],
++      forecastFinishDate: null,
++    })
++    expect(streamSummary(doc([task('A', 'QA', 1)], ['QA', 'FW'])).map((s) => s.stream)).toEqual(['QA', 'FW'])
++    expect(streamSummary(doc([task('A', 'FW', 1)], ['FW', 'SPS', 'FW'])).map((s) => [s.stream, s.total])).toEqual([['FW', 1], ['SPS', 0], ['FW', 1]])
++  })
++
++  it('counts tasks per status with every status key present, and totals them', () => {
++    const [fw, sps, , app] = streamSummary(sample())
++    expect(fw).toMatchObject({ counts: { todo: 1, in_progress: 1, done: 1 }, total: 3 })
++    expect(sps).toMatchObject({ counts: { todo: 1, in_progress: 0, done: 0 }, total: 1 })
++    expect(app).toMatchObject({ counts: { todo: 1, in_progress: 0, done: 2 }, total: 3 })
++  })
++
++  it('sums the estimates of tasks that are not done as remaining days', () => {
++    const [fw, sps, security, app] = streamSummary(sample())
++    expect([fw!.remainingDays, sps!.remainingDays, security!.remainingDays, app!.remainingDays]).toEqual([5, 1, 0, 2])
++    expect(streamSummary(doc([task('A', 'FW', 7, [], 'done')]))[0]!.remainingDays).toBe(0)
++  })
++
++  it('lists tasks with a direct open predecessor from any stream, a done task with one included', () => {
++    const [fw, sps, , app] = streamSummary(sample())
++    expect(fw!.blocked).toEqual(['B']) // A is open; D has no predecessors
++    expect(sps!.blocked).toEqual([])
++    expect(app!.blocked).toEqual(['C', 'F']) // C waits for B in FW; F is done but C is open
++  })
++
++  it('does not list a task whose direct predecessors are all done, nor count transitive ones', () => {
++    const d = doc([task('A', 'FW', 1, [], 'done'), task('B', 'FW', 1, ['A']), task('X', 'App', 1), task('Y', 'App', 1, ['X'], 'done'), task('Z', 'QA', 1, ['Y'])])
++    const [fw, , , app, qa] = streamSummary(d)
++    expect(fw!.blocked).toEqual([])
++    expect(app!.blocked).toEqual(['Y']) // X is open
++    expect(qa!.blocked).toEqual([]) // Z's only direct predecessor Y is done, although Y is inconsistent
++  })
++
++  it('sorts blocked ids in code-unit order, not by locale', () => {
++    const d = doc([task('open', 'SPS', 1), ...['b', 'a', 'B', 'A', 'a10', 'a2'].map((id) => task(id, 'FW', 1, ['open']))])
++    expect(streamSummary(d)[0]!.blocked).toEqual(['A', 'B', 'a', 'a10', 'a2', 'b'])
++  })
++
++  it('reports the latest forecast finish of the stream from schedule(doc)', () => {
++    const [fw, sps, , app] = streamSummary(sample())
++    expect(fw!.forecastFinishDate).toBe('2026-01-09') // B ends Fri day 4; the done D (day -1) does not matter
++    expect(sps!.forecastFinishDate).toBe('2026-01-05')
++    expect(app!.forecastFinishDate).toBe('2026-01-13') // C waits for B in another stream, ends Tue day 6
++  })
++
++  it('gives a stream whose tasks are all done the finish date of day -1', () => {
++    const d = doc([task('A', 'FW', 3, [], 'done'), task('B', 'FW', 2, ['A'], 'done')])
++    const [fw, sps] = streamSummary(d)
++    expect(fw!.forecastFinishDate).toBe(DAY_BEFORE_START)
++    expect(sps!.forecastFinishDate).toBeNull()
++    // day 0 on a Sunday start is the following Monday, so day -1 is the Friday before that Monday
++    const sunday = { ...d, release: { startDate: '2026-01-11' } }
++    expect(streamSummary(sunday)[0]!.forecastFinishDate).toBe('2026-01-09')
++  })
++
++  it('reports a 0-day gate at the finish of its latest predecessor', () => {
++    const gate: Task = { ...task('G', 'QA', 0, ['A']), gate: 'qa-complete' }
++    const d = doc([task('A', 'FW', 2), gate])
++    expect(streamSummary(d)[4]!.forecastFinishDate).toBe('2026-01-06')
++  })
++
++  it('does not mutate the document and ignores the order of tasks and predecessors', () => {
++    const d = doc([task('P', 'FW', 1), task('Q', 'SPS', 2), task('R', 'App', 1, ['Q', 'P']), task('S', 'App', 1, ['R', 'P', 'Q'], 'done')])
++    const before = structuredClone(d)
++    const expected = streamSummary(d)
++    expect(d).toEqual(before)
++
++    const shuffled: ReleaseDocument = { ...d, tasks: [...d.tasks].reverse().map((t) => ({ ...t, predecessors: [...t.predecessors].reverse() })) }
++    expect(streamSummary(shuffled)).toEqual(expected)
++    expect(streamSummary(d)).toEqual(expected)
++  })
++})

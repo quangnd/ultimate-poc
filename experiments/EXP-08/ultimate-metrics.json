@@ -1,0 +1,363 @@
+{
+  "cutoff": "2026-11-02T13:53:19.149Z",
+  "tool": "tools/metrics/conversation-metrics.js",
+  "conversations": {
+    "13171": {
+      "label": "coordinator",
+      "startedAt": "2026-11-02T13:09:50.714Z",
+      "endedAt": "2026-11-02T13:53:02.139Z",
+      "elapsedMinutes": 43.19,
+      "models": {
+        "claude-code/claude-opus-5-5": {
+          "calls": 97,
+          "tokens": {
+            "input": 190,
+            "output": 103074,
+            "cacheRead": 11998697,
+            "cacheWrite": 537852,
+            "total": 12639813
+          },
+          "costUsd": 8.764795
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 116,
+            "output": 13057,
+            "cacheRead": 0,
+            "cacheWrite": 186798,
+            "total": 199971
+          },
+          "costUsd": 0.597797
+        }
+      },
+      "warnings": 0
+    },
+    "13723": {
+      "label": "t1 builder",
+      "startedAt": "2026-11-02T13:21:41.240Z",
+      "endedAt": "2026-11-02T13:23:06.738Z",
+      "elapsedMinutes": 1.42,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 8,
+          "tokens": {
+            "input": 22,
+            "output": 9820,
+            "cacheRead": 232863,
+            "cacheWrite": 45054,
+            "total": 287759
+          },
+          "costUsd": 0.234165
+        }
+      },
+      "warnings": 0
+    },
+    "13736": {
+      "label": "t1 QA",
+      "startedAt": "2026-11-02T13:21:41.252Z",
+      "endedAt": "2026-11-02T13:26:46.249Z",
+      "elapsedMinutes": 5.08,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 17,
+          "tokens": {
+            "input": 46,
+            "output": 32450,
+            "cacheRead": 803798,
+            "cacheWrite": 68996,
+            "total": 905290
+          },
+          "costUsd": 0.577462
+        }
+      },
+      "warnings": 0
+    },
+    "13922": {
+      "label": "t1 reviewer",
+      "startedAt": "2026-11-02T13:24:49.013Z",
+      "endedAt": "2026-11-02T13:25:19.775Z",
+      "elapsedMinutes": 0.51,
+      "models": {
+        "openai-codex/gpt-6.1-sol": {
+          "calls": 4,
+          "tokens": {
+            "input": 25678,
+            "output": 619,
+            "cacheRead": 20352,
+            "cacheWrite": 0,
+            "total": 46649
+          },
+          "costUsd": 0.059581
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 4,
+            "output": 70,
+            "cacheRead": 0,
+            "cacheWrite": 1153,
+            "total": 1227
+          },
+          "costUsd": 0.003591
+        }
+      },
+      "warnings": 0
+    },
+    "14025": {
+      "label": "t1 single (EXP-07)",
+      "startedAt": "2026-11-02T13:25:35.121Z",
+      "endedAt": "2026-11-02T13:28:35.450Z",
+      "elapsedMinutes": 3.01,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 14,
+          "tokens": {
+            "input": 40,
+            "output": 10943,
+            "cacheRead": 408765,
+            "cacheWrite": 37407,
+            "total": 457155
+          },
+          "costUsd": 0.243904
+        }
+      },
+      "warnings": 0
+    },
+    "14140": {
+      "label": "t2 builder",
+      "startedAt": "2026-11-02T13:27:19.165Z",
+      "endedAt": "2026-11-02T13:28:38.431Z",
+      "elapsedMinutes": 1.32,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 9,
+          "tokens": {
+            "input": 24,
+            "output": 7672,
+            "cacheRead": 275299,
+            "cacheWrite": 35774,
+            "total": 318769
+          },
+          "costUsd": 0.193733
+        }
+      },
+      "warnings": 0
+    },
+    "14153": {
+      "label": "t2 QA",
+      "startedAt": "2026-11-02T13:27:19.176Z",
+      "endedAt": "2026-11-02T13:31:08.660Z",
+      "elapsedMinutes": 3.82,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 15,
+          "tokens": {
+            "input": 42,
+            "output": 24017,
+            "cacheRead": 663833,
+            "cacheWrite": 62440,
+            "total": 750332
+          },
+          "costUsd": 0.462737
+        }
+      },
+      "warnings": 0
+    },
+    "14306": {
+      "label": "t2 reviewer",
+      "startedAt": "2026-11-02T13:28:51.210Z",
+      "endedAt": "2026-11-02T13:29:19.789Z",
+      "elapsedMinutes": 0.48,
+      "models": {
+        "openai-codex/gpt-6.1-sol": {
+          "calls": 4,
+          "tokens": {
+            "input": 35238,
+            "output": 626,
+            "cacheRead": 15232,
+            "cacheWrite": 0,
+            "total": 51096
+          },
+          "costUsd": 0.078259
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 4,
+            "output": 66,
+            "cacheRead": 0,
+            "cacheWrite": 1148,
+            "total": 1218
+          },
+          "costUsd": 0.003538
+        }
+      },
+      "warnings": 0
+    },
+    "14468": {
+      "label": "t3 QA",
+      "startedAt": "2026-11-02T13:36:58.774Z",
+      "endedAt": "2026-11-02T13:42:47.019Z",
+      "elapsedMinutes": 5.8,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 22,
+          "tokens": {
+            "input": 56,
+            "output": 39651,
+            "cacheRead": 1365325,
+            "cacheWrite": 98094,
+            "total": 1503126
+          },
+          "costUsd": 0.77839
+        }
+      },
+      "warnings": 0
+    },
+    "14481": {
+      "label": "t3 builder",
+      "startedAt": "2026-11-02T13:36:58.811Z",
+      "endedAt": "2026-11-02T13:39:31.042Z",
+      "elapsedMinutes": 2.54,
+      "models": {
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 12,
+          "tokens": {
+            "input": 36,
+            "output": 9307,
+            "cacheRead": 392326,
+            "cacheWrite": 40373,
+            "total": 442042
+          },
+          "costUsd": 0.233307
+        }
+      },
+      "warnings": 0
+    },
+    "14607": {
+      "label": "t3 reviewer r1",
+      "startedAt": "2026-11-02T13:38:39.874Z",
+      "endedAt": "2026-11-02T13:39:05.745Z",
+      "elapsedMinutes": 0.43,
+      "models": {
+        "openai-codex/gpt-6.1-sol": {
+          "calls": 4,
+          "tokens": {
+            "input": 20216,
+            "output": 779,
+            "cacheRead": 35456,
+            "cacheWrite": 0,
+            "total": 56451
+          },
+          "costUsd": 0.051768
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 4,
+            "output": 85,
+            "cacheRead": 0,
+            "cacheWrite": 1427,
+            "total": 1516
+          },
+          "costUsd": 0.004426
+        }
+      },
+      "warnings": 0
+    },
+    "14715": {
+      "label": "t3 reviewer r2",
+      "startedAt": "2026-11-02T13:39:39.602Z",
+      "endedAt": "2026-11-02T13:40:12.380Z",
+      "elapsedMinutes": 0.55,
+      "models": {
+        "openai-codex/gpt-6.1-sol": {
+          "calls": 3,
+          "tokens": {
+            "input": 12078,
+            "output": 490,
+            "cacheRead": 13696,
+            "cacheWrite": 0,
+            "total": 26264
+          },
+          "costUsd": 0.030426
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 4,
+            "output": 79,
+            "cacheRead": 0,
+            "cacheWrite": 1088,
+            "total": 1171
+          },
+          "costUsd": 0.003518
+        }
+      },
+      "warnings": 0
+    },
+    "14896": {
+      "label": "post-hoc reviewer (Pi + single)",
+      "startedAt": "2026-11-02T13:44:58.582Z",
+      "endedAt": "2026-11-02T13:46:19.099Z",
+      "elapsedMinutes": 1.34,
+      "models": {
+        "openai-codex/gpt-6.1-sol": {
+          "calls": 7,
+          "tokens": {
+            "input": 40470,
+            "output": 1378,
+            "cacheRead": 132480,
+            "cacheWrite": 0,
+            "total": 174328
+          },
+          "costUsd": 0.107968
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 4,
+            "output": 71,
+            "cacheRead": 0,
+            "cacheWrite": 1334,
+            "total": 1409
+          },
+          "costUsd": 0.004053
+        }
+      },
+      "warnings": 0
+    },
+    "15049": {
+      "label": "PR #55 reviewer",
+      "startedAt": "2026-11-02T13:50:40.203Z",
+      "endedAt": "2026-11-02T13:51:34.166Z",
+      "elapsedMinutes": 0.9,
+      "models": {
+        "openai-codex/gpt-6.1-sol": {
+          "calls": 6,
+          "tokens": {
+            "input": 39636,
+            "output": 1586,
+            "cacheRead": 103168,
+            "cacheWrite": 0,
+            "total": 144390
+          },
+          "costUsd": 0.105449
+        },
+        "github-copilot/claude-sonnet-5.5": {
+          "calls": 0,
+          "tokens": {
+            "input": 4,
+            "output": 85,
+            "cacheRead": 0,
+            "cacheWrite": 2254,
+            "total": 2343
+          },
+          "costUsd": 0.006493
+        }
+      },
+      "warnings": 0
+    }
+  }
+}

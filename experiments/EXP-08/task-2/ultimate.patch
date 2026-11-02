@@ -1,0 +1,205 @@
+diff --git a/src/domain/gates.ts b/src/domain/gates.ts
+new file mode 100644
+index 0000000..4cf1683
+--- /dev/null
++++ b/src/domain/gates.ts
+@@ -0,0 +1,45 @@
++/**
++ * Gate status summary for the dashboard (US-05, US-06; ADR-002 §6, §8). Pure: no I/O, no clock, no randomness.
++ * Precondition, not re-checked: the document passed validateDocument (each gate on at most one task).
++ */
++import { schedule } from './schedule'
++import { GATES, type Gate, type IsoDate, type ReleaseDocument, type Status } from './types'
++
++export interface GateStatus {
++  gate: Gate
++  /** false when no task carries this gate */
++  defined: boolean
++  /** the gate task's id; absent when not defined */
++  taskId?: string
++  /** the gate task's status; absent when not defined */
++  status?: Status
++  /** true only when defined and the gate task's status is 'done' */
++  done: boolean
++  /** the gate task's forecast finish date from schedule(doc); absent when not defined */
++  forecastFinishDate?: IsoDate
++  /** the gate task's targetDate; absent when the task has none or the gate is not defined */
++  targetDate?: IsoDate
++  /** the gate task's slipDays from schedule(doc) (positive = late); absent when there is no targetDate */
++  slipDays?: number
++}
++
++/** One entry per mandatory gate, in `GATES` order. Optional fields that do not apply are left out, never `undefined`. */
++export function gateStatus(doc: ReleaseDocument): GateStatus[] {
++  const slots = new Map(schedule(doc).tasks.map((t) => [t.id, t]))
++  return GATES.map((gate): GateStatus => {
++    const task = doc.tasks.find((t) => t.gate === gate)
++    if (task === undefined) return { gate, defined: false, done: false }
++    const slot = slots.get(task.id)
++    if (slot === undefined) throw new Error(`gates: task ${task.id} is not in the forecast`)
++    return {
++      gate,
++      defined: true,
++      taskId: task.id,
++      status: task.status,
++      done: task.status === 'done',
++      forecastFinishDate: slot.finishDate,
++      ...(task.targetDate === undefined ? {} : { targetDate: task.targetDate }),
++      ...(slot.slipDays === undefined ? {} : { slipDays: slot.slipDays }),
++    }
++  })
++}
+diff --git a/tests/domain/gates.test.ts b/tests/domain/gates.test.ts
+new file mode 100644
+index 0000000..21063f7
+--- /dev/null
++++ b/tests/domain/gates.test.ts
+@@ -0,0 +1,148 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { gateStatus, type GateStatus } from '../../src/domain/gates'
++import { schedule } from '../../src/domain/schedule'
++import { GATES, type Gate, type ReleaseDocument, type Status, type Task } from '../../src/domain/types'
++import { validateDocument } from '../../src/domain/validate'
++
++// Hand computations use day0 = Mon 2026-01-05: day 0 Mon 01-05, 1 Tue 01-06, 2 Wed 01-07, 3 Thu 01-08, 4 Fri 01-09;
++// day -1 (done tasks) is Fri 2026-01-02.
++
++function task(
++  id: string,
++  stream: string,
++  estimateDays: number,
++  predecessors: string[] = [],
++  extra: { status?: Status; targetDate?: string; gate?: Gate } = {},
++): Task {
++  return { id, title: id, stream, ownerRole: 'owner', status: 'todo', estimateDays, predecessors, ...extra }
++}
++
++function doc(tasks: Task[], release: { startDate?: string; targetDate?: string } = {}): ReleaseDocument {
++  return {
++    schemaVersion: 1,
++    release: { startDate: '2026-01-05', ...release },
++    workstreams: ['FW', 'SPS', 'Security', 'App', 'QA'],
++    tasks,
++  }
++}
++
++/**
++ * Three gates defined, one missing (qa-complete):
++ * - G-FW   fw-integrated:     todo, after FW1 (FW, 2 days): finishes day 1 = 01-06; target 01-05 -> slip +1
++ * - G-SEC  security-verified: in_progress, after SECW (Security, 3 days): finishes day 2 = 01-07; target Fri 01-09 -> slip -2
++ * - G-APP  app-integration:   done, no target: finishes day -1 = 01-02; no targetDate, no slipDays
++ */
++const tasks = (): Task[] => [
++  task('FW1', 'FW', 2),
++  task('G-FW', 'FW', 0, ['FW1'], { gate: 'fw-integrated', targetDate: '2026-01-05' }),
++  task('SECW', 'Security', 3),
++  task('G-SEC', 'Security', 0, ['SECW'], { gate: 'security-verified', status: 'in_progress', targetDate: '2026-01-09' }),
++  task('G-APP', 'App', 0, [], { gate: 'app-integration', status: 'done' }),
++]
++
++const expected: GateStatus[] = [
++  { gate: 'fw-integrated', defined: true, taskId: 'G-FW', status: 'todo', done: false, forecastFinishDate: '2026-01-06', targetDate: '2026-01-05', slipDays: 1 },
++  { gate: 'security-verified', defined: true, taskId: 'G-SEC', status: 'in_progress', done: false, forecastFinishDate: '2026-01-07', targetDate: '2026-01-09', slipDays: -2 },
++  { gate: 'app-integration', defined: true, taskId: 'G-APP', status: 'done', done: true, forecastFinishDate: '2026-01-02' },
++  { gate: 'qa-complete', defined: false, done: false },
++]
++
++describe('gateStatus', () => {
++  it('returns the four gates in GATES order, whatever the task order', () => {
++    const forward = gateStatus(doc(tasks()))
++    expect(forward.map((g) => g.gate)).toEqual([...GATES])
++    expect(gateStatus(doc(tasks().reverse()))).toStrictEqual(forward)
++    const [first, ...rest] = tasks()
++    expect(gateStatus(doc([...rest, first!]))).toStrictEqual(forward)
++  })
++
++  it('reports taskId, status, done, forecast, target and slip of defined gates', () => {
++    expect(gateStatus(doc(tasks()))).toStrictEqual(expected)
++  })
++
++  it('takes forecastFinishDate and slipDays from schedule(doc), targetDate from the task', () => {
++    const d = doc(tasks())
++    const byId = new Map(schedule(d).tasks.map((t) => [t.id, t]))
++    for (const g of gateStatus(d).filter((s) => s.defined)) {
++      const slot = byId.get(g.taskId!)!
++      expect(g.forecastFinishDate).toBe(slot.finishDate)
++      expect(g.slipDays).toBe(slot.slipDays)
++      expect(g.targetDate).toBe(d.tasks.find((t) => t.id === g.taskId)!.targetDate)
++    }
++  })
++
++  it('marks only a done gate task as done', () => {
++    const statuses: Status[] = ['todo', 'in_progress', 'done']
++    for (const status of statuses) {
++      const [g] = gateStatus(doc([task('G', 'FW', 0, [], { gate: 'fw-integrated', status })]))
++      expect(g).toMatchObject({ defined: true, taskId: 'G', status, done: status === 'done' })
++    }
++  })
++
++  it('reports a gate no task carries as exactly { gate, defined: false, done: false }', () => {
++    const result = gateStatus(doc([task('A', 'FW', 1)]))
++    expect(result).toHaveLength(4)
++    GATES.forEach((gate, i) => {
++      expect(result[i]).toStrictEqual({ gate, defined: false, done: false })
++      expect(Object.keys(result[i]!)).toEqual(['gate', 'defined', 'done'])
++    })
++    expect(gateStatus(doc([]))).toStrictEqual(GATES.map((gate) => ({ gate, defined: false, done: false })))
++  })
++
++  it('leaves out optional fields that do not apply: no undefined-valued keys, no null', () => {
++    const result = gateStatus(doc(tasks()))
++    for (const g of result) {
++      for (const [key, value] of Object.entries(g)) {
++        expect(value, `${g.gate}.${key}`).not.toBeUndefined()
++        expect(value, `${g.gate}.${key}`).not.toBeNull()
++      }
++    }
++    // A defined gate without a target has neither targetDate nor slipDays; the others have both.
++    expect(Object.keys(result[2]!)).toEqual(['gate', 'defined', 'taskId', 'status', 'done', 'forecastFinishDate'])
++    expect(Object.keys(result[0]!)).toEqual(['gate', 'defined', 'taskId', 'status', 'done', 'forecastFinishDate', 'targetDate', 'slipDays'])
++  })
++
++  it('serialises stably: same JSON for repeated calls and shuffled tasks', () => {
++    const json = JSON.stringify(gateStatus(doc(tasks())))
++    expect(JSON.stringify(gateStatus(doc(tasks())))).toBe(json)
++    expect(JSON.stringify(gateStatus(doc(tasks().reverse())))).toBe(json)
++    expect(JSON.parse(json)).toStrictEqual(expected)
++  })
++
++  it('is pure: does not mutate the document and gives identical output for identical input', () => {
++    const d = doc(tasks(), { targetDate: '2026-01-12' })
++    const snapshot = structuredClone(d)
++    const deepFreeze = (o: unknown): void => {
++      if (o !== null && typeof o === 'object') Object.values(o).forEach(deepFreeze), Object.freeze(o)
++    }
++    deepFreeze(d)
++    const first = gateStatus(d)
++    expect(d).toStrictEqual(snapshot)
++    expect(gateStatus(d)).toStrictEqual(first)
++    expect(gateStatus(structuredClone(snapshot))).toStrictEqual(first)
++  })
++
++  it('does not depend on the release target: it never moves a gate forecast', () => {
++    const without = gateStatus(doc(tasks()))
++    expect(gateStatus(doc(tasks(), { targetDate: '2025-12-01' }))).toStrictEqual(without)
++  })
++
++  it('summarises the fixture: four gates defined, matching schedule()', () => {
++    const fixture = JSON.parse(readFileSync(new URL('../../fixtures/release.json', import.meta.url), 'utf8')) as ReleaseDocument
++    expect(validateDocument(fixture).ok).toBe(true)
++    const result = gateStatus(fixture)
++    expect(result.map((g) => [g.gate, g.taskId])).toEqual([
++      ['fw-integrated', 'FW-06'],
++      ['security-verified', 'SEC-05'],
++      ['app-integration', 'APP-05'],
++      ['qa-complete', 'QA-04'],
++    ])
++    const byId = new Map(schedule(fixture).tasks.map((t) => [t.id, t]))
++    for (const g of result) {
++      expect(g.defined).toBe(true)
++      expect(g.forecastFinishDate).toBe(byId.get(g.taskId!)!.finishDate)
++      expect(g.slipDays).toBe(byId.get(g.taskId!)!.slipDays)
++    }
++  })
++})

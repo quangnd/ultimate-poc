@@ -1,0 +1,245 @@
+diff --git a/src/domain/links.ts b/src/domain/links.ts
+new file mode 100644
+index 0000000..f6bec87
+--- /dev/null
++++ b/src/domain/links.ts
+@@ -0,0 +1,50 @@
++/** Adding and removing a finish-to-start dependency link (US-03, ADR-002 §9). Pure: no I/O, no clock, no randomness. */
++import type { ReleaseDocument, Task } from './types'
++import { validateDocument } from './validate'
++
++export interface LinkError {
++  code: string
++  message: string
++  taskId?: string
++  /** only for code 'cycle': as in ValidationError.cycle */
++  cycle?: string[]
++}
++export type LinkResult = { ok: true; document: ReleaseDocument } | { ok: false; errors: LinkError[] }
++
++const unknownTask = (taskId: string): LinkResult => ({
++  ok: false,
++  errors: [{ code: 'unknown-task', message: `unknown task ${taskId}`, taskId }],
++})
++
++/** A copy of `doc` (the input is never mutated) and its task `taskId`, if any. Ids are unique by precondition. */
++function copyWithTask(doc: ReleaseDocument, taskId: string): { document: ReleaseDocument; task?: Task } {
++  const document = structuredClone(doc)
++  return { document, task: document.tasks.find((t) => t.id === taskId) }
++}
++
++/**
++ * Make `predecessorId` a finish-to-start predecessor of `taskId`. `doc` must have passed `validateDocument`.
++ * The new document is validated as a whole, so every rejection carries the validator's code and message
++ * (unknown, self or repeated predecessor, cycle); with a valid `doc`, only the new link can cause them.
++ */
++export function addLink(doc: ReleaseDocument, taskId: string, predecessorId: string): LinkResult {
++  const { document, task } = copyWithTask(doc, taskId)
++  if (!task) return unknownTask(taskId)
++  task.predecessors.push(predecessorId)
++  const result = validateDocument(document)
++  return result.ok ? { ok: true, document } : { ok: false, errors: result.errors }
++}
++
++/** Remove `predecessorId` from the predecessors of `taskId`. `doc` must have passed `validateDocument`. */
++export function removeLink(doc: ReleaseDocument, taskId: string, predecessorId: string): LinkResult {
++  const { document, task } = copyWithTask(doc, taskId)
++  if (!task) return unknownTask(taskId)
++  if (!task.predecessors.includes(predecessorId)) {
++    return {
++      ok: false,
++      errors: [{ code: 'unknown-link', message: `${predecessorId} is not a predecessor of task ${taskId}`, taskId }],
++    }
++  }
++  task.predecessors = task.predecessors.filter((p) => p !== predecessorId)
++  return { ok: true, document }
++}
+diff --git a/tests/domain/links.test.ts b/tests/domain/links.test.ts
+new file mode 100644
+index 0000000..98c17a9
+--- /dev/null
++++ b/tests/domain/links.test.ts
+@@ -0,0 +1,183 @@
++import { describe, expect, it } from 'vitest'
++import { addLink, removeLink, type LinkError } from '../../src/domain/links'
++import type { ReleaseDocument, Task } from '../../src/domain/types'
++import { validateDocument } from '../../src/domain/validate'
++
++const task = (id: string, predecessors: string[] = [], over: Partial<Task> = {}): Task => ({
++  id,
++  title: `Task ${id}`,
++  stream: 'FW',
++  ownerRole: 'owner',
++  status: 'todo',
++  estimateDays: 2,
++  predecessors,
++  ...over,
++})
++
++// Task order is deliberately not id order: results must keep it.
++const base = (): ReleaseDocument => ({
++  schemaVersion: 1,
++  release: { startDate: '2026-01-05', targetDate: '2026-03-31' },
++  workstreams: ['FW', 'QA'],
++  tasks: [
++    task('C', ['B', 'A'], { stream: 'QA', targetDate: '2026-02-02', gate: 'qa-complete' }),
++    task('A'),
++    task('B', ['A'], { status: 'in_progress' }),
++    task('D', [], { estimateDays: 0, gate: 'fw-integrated' }),
++  ],
++})
++
++const valid = (doc: ReleaseDocument) => {
++  const result = validateDocument(doc)
++  if (!result.ok) throw new Error(`test document is invalid: ${result.errors.map((e) => e.code).join(', ')}`)
++  return doc
++}
++const ok = (result: ReturnType<typeof addLink>): ReleaseDocument => {
++  if (!result.ok) throw new Error(`expected success, got ${result.errors.map((e) => e.code).join(', ')}`)
++  return result.document
++}
++const errorsOf = (result: ReturnType<typeof addLink>): LinkError[] => {
++  if (result.ok) throw new Error('expected a failure')
++  return result.errors
++}
++
++describe('addLink', () => {
++  it('appends the predecessor at the end of the target task and changes nothing else', () => {
++    const input = valid(base())
++    const document = ok(addLink(input, 'C', 'D'))
++
++    const expected = base()
++    expected.tasks[0]!.predecessors = ['B', 'A', 'D']
++    expect(document).toEqual(expected)
++    expect(document.tasks.map((t) => t.id)).toEqual(['C', 'A', 'B', 'D'])
++  })
++
++  it('does not mutate the input, on success or failure, and shares no objects with the result', () => {
++    const input = valid(base())
++    const document = ok(addLink(input, 'A', 'D'))
++    expect(input).toEqual(base())
++    document.tasks[0]!.predecessors.push('changed')
++    document.tasks[1]!.title = 'changed'
++    expect(input).toEqual(base())
++
++    for (const [id, pred] of [['A', 'B'], ['A', 'A'], ['A', 'C'], ['A', 'X'], ['X', 'A']] as const) {
++      expect(addLink(input, id, pred).ok).toBe(false)
++      expect(input).toEqual(base())
++    }
++  })
++
++  it('returns a document that passes validateDocument', () => {
++    const document = ok(addLink(valid(base()), 'A', 'D'))
++    expect(validateDocument(document).ok).toBe(true)
++  })
++
++  it('is deterministic', () => {
++    const input = valid(base())
++    expect(addLink(input, 'A', 'D')).toEqual(addLink(input, 'A', 'D'))
++    expect(addLink(input, 'A', 'C')).toEqual(addLink(input, 'A', 'C'))
++  })
++
++  it('rejects an unknown task with exactly one unknown-task error', () => {
++    const errors = errorsOf(addLink(valid(base()), 'X', 'A'))
++    expect(errors).toHaveLength(1)
++    expect(errors[0]).toMatchObject({ code: 'unknown-task', taskId: 'X' })
++    // an unknown task is reported alone even when the predecessor is unknown too
++    expect(errorsOf(addLink(valid(base()), 'X', 'Y'))).toMatchObject([{ code: 'unknown-task', taskId: 'X' }])
++  })
++
++  it('rejects an unknown predecessor, a self link and an existing link with the validator codes', () => {
++    const input = valid(base())
++    const one = (taskId: string, predecessorId: string) => {
++      const errors = errorsOf(addLink(input, taskId, predecessorId))
++      expect(errors).toHaveLength(1)
++      return errors[0]!
++    }
++    expect(one('A', 'X')).toMatchObject({ code: 'unknown-predecessor', taskId: 'A' })
++    expect(one('A', 'A')).toMatchObject({ code: 'self-predecessor', taskId: 'A' })
++    expect(one('B', 'A')).toMatchObject({ code: 'repeated-predecessor', taskId: 'B' })
++  })
++
++  it('rejects a link that closes a cycle with the validator cycle and message', () => {
++    // C depends on B and B on A, so A depending on C closes A -> C -> B -> A
++    const input = valid(ok(removeLink(valid(base()), 'C', 'A')))
++    const errors = errorsOf(addLink(input, 'A', 'C'))
++    expect(errors).toHaveLength(1)
++    expect(errors[0]).toMatchObject({ code: 'cycle', cycle: ['A', 'C', 'B'], message: 'dependency cycle: A -> C -> B -> A' })
++
++    // the same error the validator reports for the resulting document
++    const resulting = structuredClone(input)
++    resulting.tasks.find((t) => t.id === 'A')!.predecessors.push('C')
++    const validated = validateDocument(resulting)
++    expect(validated.ok).toBe(false)
++    if (!validated.ok) expect(errors).toEqual(validated.errors)
++  })
++
++  it('reports a two-task cycle', () => {
++    const errors = errorsOf(addLink(valid(base()), 'A', 'B'))
++    expect(errors).toMatchObject([{ code: 'cycle', cycle: ['A', 'B'], message: 'dependency cycle: A -> B -> A' }])
++  })
++
++  it('accepts a link between tasks of different streams and keeps unknown extra fields', () => {
++    const input = { ...valid(base()), note: 'extra' } as ReleaseDocument
++    const document = ok(addLink(input, 'D', 'C'))
++    expect(document).toEqual({ ...base(), note: 'extra', tasks: base().tasks.map((t) => (t.id === 'D' ? { ...t, predecessors: ['C'] } : t)) })
++  })
++})
++
++describe('removeLink', () => {
++  it('removes the predecessor, keeps the order of the others and changes nothing else', () => {
++    const input = valid(base())
++    const document = ok(removeLink(input, 'C', 'B'))
++
++    const expected = base()
++    expected.tasks[0]!.predecessors = ['A']
++    expect(document).toEqual(expected)
++    expect(ok(removeLink(valid(base()), 'C', 'A')).tasks[0]!.predecessors).toEqual(['B'])
++  })
++
++  it('can remove the last predecessor and returns a valid document', () => {
++    const document = ok(removeLink(valid(base()), 'B', 'A'))
++    expect(document.tasks.find((t) => t.id === 'B')!.predecessors).toEqual([])
++    expect(validateDocument(document).ok).toBe(true)
++  })
++
++  it('does not mutate the input, on success or failure, and shares no objects with the result', () => {
++    const input = valid(base())
++    const document = ok(removeLink(input, 'C', 'B'))
++    expect(input).toEqual(base())
++    document.tasks[0]!.predecessors.push('changed')
++    document.tasks[1]!.title = 'changed'
++    expect(input).toEqual(base())
++
++    for (const [id, pred] of [['C', 'D'], ['A', 'A'], ['X', 'A']] as const) {
++      expect(removeLink(input, id, pred).ok).toBe(false)
++      expect(input).toEqual(base())
++    }
++  })
++
++  it('is deterministic', () => {
++    const input = valid(base())
++    expect(removeLink(input, 'C', 'B')).toEqual(removeLink(input, 'C', 'B'))
++    expect(removeLink(input, 'C', 'D')).toEqual(removeLink(input, 'C', 'D'))
++  })
++
++  it('rejects an unknown task with exactly one unknown-task error', () => {
++    const errors = errorsOf(removeLink(valid(base()), 'X', 'A'))
++    expect(errors).toHaveLength(1)
++    expect(errors[0]).toMatchObject({ code: 'unknown-task', taskId: 'X' })
++  })
++
++  it('rejects a predecessor that is not linked with exactly one unknown-link error', () => {
++    const input = valid(base())
++    for (const pred of ['D', 'X', 'C']) {
++      const errors = errorsOf(removeLink(input, 'C', pred))
++      expect(errors).toHaveLength(1)
++      expect(errors[0]).toMatchObject({ code: 'unknown-link', taskId: 'C' })
++    }
++  })
++
++  it('undoes addLink', () => {
++    const input = valid(base())
++    expect(ok(removeLink(ok(addLink(input, 'A', 'D')), 'A', 'D'))).toEqual(input)
++  })
++})
