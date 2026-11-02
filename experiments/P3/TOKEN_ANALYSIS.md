@@ -32,11 +32,11 @@ Classification rules (D):
   - `text-only`: no tool call.
 - **Context of a call:** input + cacheRead + cacheWrite.
 
-## 1. Token shares (M)
+## 1. Token shares (tokens and cost M; shares D)
 
 Coordinator #1510, all 291 opus calls:
 
-| Field | Tokens | Share of tokens | Cost | Share of cost (D) |
+| Field | Tokens (M) | Share of tokens (D) | Cost (D, fitted prices) | Share of cost (D) |
 |---|---|---|---|---|
 | cacheRead (context re-reads) | 85,730,615 | **97.9 %** | $17.15 | 51 % |
 | cacheWrite | 1,646,435 | 1.9 % | $13.17 | **39 %** |
@@ -59,7 +59,7 @@ Coordinator #1510, all 291 opus calls:
 - P2 had only 17 % more calls than P1, but 2.7× the tokens.
 - **P2 coordinator share (D):** 64.06M opus + 0.27M sonnet, against 17.1M for the P2 children (P2 log). That is **79 % of P2 tokens**, which matches the PO's "~80 %".
 
-## 3. Context size over time (M)
+## 3. Context size over time (per-call context M; min/median/p90/max D)
 
 Context per call grows almost monotonically. There is no compaction, so it never shrinks.
 
@@ -125,11 +125,13 @@ By what the call did (D):
   - 6 × "Incomplete Claude Code upstream response (status unknown … relay failure)";
   - 1 × status 429 rate limit.
 - All 7 recorded **0 tokens and $0**.
-- **Resume calls:** the first successful calls after a resume re-read a warm cache: cacheWrite 2.3k–3.3k, $0.09–0.14 each.
+- **Resume calls:** in #1510, the first successful calls after the short outages (F2, F3, F6) re-read a warm cache: cacheWrite 2.3k–3.3k, $0.09–0.14 each.
 - **Cost of retries:** negligible, except the resume after the 8 h gap (§7).
 - Details per incident are in `FAILURES.md`.
 
-## 7. The ~8.5 h gap and the cache (M)
+## 7. The 8 h 07 min gap and the cache (M)
+
+The P2 log's "~8.5 h" was an approximation. Measured from call to call (16:03:27 → 00:10:33 UTC), the gap is 8 h 07 min.
 
 - **Timeline:**
   - last successful call 16:03:27 UTC;

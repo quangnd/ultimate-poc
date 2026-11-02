@@ -20,6 +20,8 @@ All times are UTC. "Idle gap" runs from the last successful call before the fail
 | F6 | #1510 | 5891, 00:39:04 | upstream, status unknown | browser | resume input (pi.user 5893, 00:40:06) | the run continued | 1.3 min | none |
 | F7 | #6558 (this analysis) | 7000, 04:10:24 | **429 rate limit** (claude-code account) | write (TOKEN_ANALYSIS.md draft) | no: run paused (`pause.limit`, #52 7001) | **Play** by the human (pause.note 7014, 06:41:20) | **2 h 31 min** | none: the file was intact and the edit continued |
 
+F7 is the same account-wide claude-code 429 window that paused the EXP-05 coordinator #6576 (about 04:10–06:35 UTC, recorded in `experiments/EXP-05/RUN-20261102-01.md`, PR #34). It counts as one infrastructure event that hit two conversations.
+
 ## Root #52
 
 - 0 failed model calls of its own (M: 101 assistant entries checked).
@@ -38,7 +40,7 @@ All times are UTC. "Idle gap" runs from the last successful call before the fail
   - `gh pr list --state all` shows no duplicate PR for any branch.
   - The P1/P2 issue → PR → merge tables have one merge per PR.
 - **Cost of the gaps:**
-  - The short outages (F1–F3, F5, F6) cost ≤ 3 min each and resumed on a warm cache: the first call's cacheWrite was 2.3k–3.3k, $0.09–0.14.
+  - The short outages (F1–F3, F5, F6) cost ≤ 3 min each and resumed on a warm cache: the first successful call's cacheWrite was 2.3k–3.3k ($0.09–0.14) in #1510 (F2, F3, F6), 1.2k ($0.03) in #5453 (F5), and 16.4k in #6558 (F1, a branch's first call, so a cache write was expected).
   - The two rate-limit stops cost wall-clock time: 8 h 07 min and 2 h 31 min.
   - F4 also cost one full cache rewrite.
 - **Agent-error vs infrastructure:** all incidents above are infrastructure. None was caused by agent behaviour. The P1 hang of `gh` waiting on stdin (P1 log) is an agent/tool-usage error and is not listed here.
