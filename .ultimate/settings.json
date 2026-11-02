@@ -1,4 +1,7 @@
 {
+  "isolates": {
+    "worktree": { "setup": ["npm ci --no-audit --no-fund"] }
+  },
   "lander": {
     "checks": [
       "npm ci --no-audit --no-fund",
