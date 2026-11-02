@@ -46,10 +46,14 @@ export function draftFrom(doc: ReleaseDocument): Draft {
   }
 }
 
-/** A number when the text is one ("1.5", "-2"), so the validator judges its value; anything else stays text and is refused. */
+/**
+ * A whole number when the text is one ("3", "3.0", "-2"), so the validator judges its value. Anything else stays text
+ * and is refused, including every nonzero fraction: `Number("1.0000000000000001")` is 1, which would silently drop the
+ * fraction the operator typed (reviewer #5081).
+ */
 export function parseEstimate(text: string): number | string {
   const trimmed = text.trim()
-  return /^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(trimmed) ? Number(trimmed) : text
+  return /^[+-]?\d+(\.0*)?$/.test(trimmed) && Number.isSafeInteger(Number(trimmed)) ? Number(trimmed) : text
 }
 
 /** The whole document the draft would store, field order as in the fixture; it is validated, never repaired. */
@@ -117,6 +121,8 @@ export function suggestId(draft: Draft, stream: string): string {
     const match = t.stream === stream ? /^(.*?)(\d+)$/.exec(t.id) : null
     if (!match) continue
     const n = Number(match[2])
+    // Only safe integers can be incremented; a longer number would never advance (reviewer #5081).
+    if (!Number.isSafeInteger(n + 1)) continue
     if (next === 1 || n >= next) {
       prefix = match[1]!
       width = match[2]!.length

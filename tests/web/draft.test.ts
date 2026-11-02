@@ -60,7 +60,12 @@ describe('parseEstimate keeps what was typed for the validator to judge', () => 
   it.each([
     ['8', 8],
     [' 8 ', 8],
-    ['1.5', 1.5],
+    // Fractions stay text, so the validator refuses them and the field keeps them (reviewer #5081: Number() rounded
+    // "1.0000000000000001" to 1 and it was stored as 1).
+    ['1.5', '1.5'],
+    ['1.0000000000000001', '1.0000000000000001'],
+    ['0.99999999999999999', '0.99999999999999999'],
+    ['3.0', 3],
     ['-2', -2],
     ['', ''],
     ['3d', '3d'],
@@ -145,6 +150,12 @@ describe('add', () => {
     expect(suggestId(draftFrom(base), 'FW')).toBe('FW-07')
     expect(suggestId(draftFrom(base), 'Security')).toBe('SEC-06')
     expect(suggestId({ tasks: [], nextKey: 0 }, 'Security')).toBe('SEC-01')
+  })
+
+  // Regression (reviewer #5081): an unsafe numeric suffix never advanced, so this looped forever.
+  it('terminates beside an id whose number is past the safe integer range', () => {
+    const draft = draftFrom({ ...base, tasks: [{ ...base.tasks[0]!, id: 'FW-9007199254740992' }] })
+    expect(suggestId(draft, 'FW')).toBe('FW-01')
   })
 
   it('a new task is valid once it has an id, and counts as added', () => {

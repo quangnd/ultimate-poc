@@ -61,6 +61,9 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
   }, [placed])
 
   const edit = (next: Draft) => {
+    // While a save is in flight the table is inert; an edit made now would be lost when the saved document reloads
+    // the draft (reviewer #5081).
+    if (attempt.kind === 'saving') return
     setDraft(next)
     // A server refusal describes the document it was sent; after any edit, the live check speaks again.
     setAttempt((a) => (a.kind === 'refused-server' || a.kind === 'failed' || a.kind === 'saved' ? { kind: 'none' } : a))
@@ -162,7 +165,7 @@ export function Editor({ base, baseForecast, baseReady, draft, setDraft, onSaved
         onGoTo={goTo}
       />
 
-      <section className="section editor-table-section" aria-labelledby="editor-title">
+      <section className="section editor-table-section" aria-labelledby="editor-title" inert={attempt.kind === 'saving'} aria-busy={attempt.kind === 'saving'}>
         <div className="editor-head">
           <h2 id="editor-title">Tasks, links and gates</h2>
           <p className="section-note">
