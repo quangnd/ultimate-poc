@@ -22,6 +22,20 @@ before its experiment runs with the evidence standard of docs/EVALUATION.md.
 | Self-modifying workflow | Propose safe improvements | Agents may edit `.ultimate/` agents/skills/extensions (hot reload), `self.restart` for core; second `instance` for isolated testing; dream proposes memory/tool changes | `AGENTS.md:53` (reload layers); `extensions/self/README.md:1-5`; `extensions/instance/README.md`; `extensions/dream/README.md` | Not exercised (forbidden in P0 without approval). Documented only. | EXP-06 | UNVERIFIED |
 | Auditability | Track actions, outputs, cost | `debug` trace (service/action/tool/model calls with trace ids), `pi.usage` per model tokens + USD, durable event log, commit trailer `Ultimate-Conversation: <id>`, lander log | `extensions/debug/README.md:5-11`; `extensions/status-line/README.md:7`; `extensions/coding-tools/README.md` | `ultimate.trace({conversation})` returned model rows per provider/model; `pi.usage` returned tokens and USD per model for #52, #215, #413, #436; `tools/metrics/` extracts them (experiments/EXP-00/instrumentation-check.md). USD is a list-price proxy (subscriptions). | EXP-01..08 | PARTIAL |
 
+## P3 results (2026-11-02, coordinator #52; the P0 rows above are kept as history)
+
+| Capability | P3 status | Evidence | Limitation |
+|---|---|---|---|
+| Browser chat / model selection | PARTIAL | Used throughout; models proven per conversation (ENVIRONMENT.md, TOKEN_ANALYSIS.md) | No per-run subagent model override (NOT AVAILABLE, p0-findings); EXP-08 not run |
+| Conversation branching | PARTIAL | Every issue ran as its own branch with its own worktree (P1–P3 logs) | EXP-01 proper pending the PO's questions |
+| Durable execution | **PASS** | experiments/EXP-02: host restart mid-worker, resumed in ~28 s, byte-identical files, no duplicate commits | n=1; 16 failed calls / 3 rate-limit pauses recovered without repeated effects (FAILURES.md), 2 of the pauses needed a manual Play |
+| Tasks, plans, documents | **PASS** | experiments/EXP-04: plan epic tracked #32 through a restart and agreed with GitHub | GitHub alone does not show per-unit ownership |
+| Subagents / delegation | **PASS** | experiments/EXP-03 and DREAM_VALIDATION.md (#41): builder + blind QA + reviewer, separate trails, no conflicting writes | Fixed E2E ports collided across worktrees (F8) until Dream #2 |
+| Project context/memory | PARTIAL | EXP-01 early probe 10/10 (self-authored); branches start from the memory index | Workers get no memory index and never called `memory` (EXP-06); EXP-01 proper pending |
+| Custom surfaces / extensions | **PASS** (built, not adopted) | experiments/EXP-05: read-only panel, isolated instance, screenshot after reload, reviewer approved; PR #34 | No documented API to read GitHub issues (NOT AVAILABLE); no type-check for project extensions; adoption awaits the PO |
+| Self-modifying workflow | PARTIAL | EXP-06 pass condition met (rule with scope/evidence, no unapproved change); Dream → 13 PO-approved changes, 6 VALIDATED (DREAM_VALIDATION.md, P3/GATE_SUMMARY.md) | EXP-06 showed no transfer of a memory rule to workers |
+| Auditability | **PASS** | `ultimate.trace`, `pi.usage`, `ultimate.search` reproduced every metric and the failure re-count (FAILURES.md) | Trace keeps the newest 1000 rows / ~7 days; USD is a list-price proxy |
+
 Allowed status: UNVERIFIED, PASS, PARTIAL, FAIL, NOT AVAILABLE. Record version, limitation and direct proof. Distinguish framework advertised behavior from POC implementation.
 
 Limitations of the P0 smoke column: it was made by Ultimate agents observing Ultimate (self-assessment); the
