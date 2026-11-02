@@ -48,9 +48,16 @@ The rows above F1–F8 and the original totals are kept as written. A re-count f
 
 ```js
 // every pi.assistant entry of every conversation, paged with `before`
-for (const { id } of await ultimate.conversations())
-  for (const e of await ultimate.entries(id, { kinds: ['pi.assistant'], limit: 500 }))
-    if (e.model[0].stopReason === 'error') hits.push(`${id}/${e.id}`)
+const hits = []
+for (const { id } of await ultimate.conversations()) {
+  let before
+  for (;;) {
+    const es = await ultimate.entries(id, { kinds: ['pi.assistant'], limit: 500, before })
+    for (const e of es) if (e.model[0].stopReason === 'error') hits.push(`${id}/${e.id}`)
+    if (es.length < 500) break
+    before = es[es.length - 1].id
+  }
+}
 // cross-check
 await ultimate.search('"stopReason":"error"', { limit: 200 })
 ```
