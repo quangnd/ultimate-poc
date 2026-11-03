@@ -1,0 +1,4 @@
+  ✘  1 [chromium] › e2e/import-preview.spec.ts:6:1 › the import preview shows the firmware delay before it replaces the stored release, and the dashboard shows it after (5.8s)
+    Error: expect(locator).toContainText(expected) failed
+    Expected substring: "1 task changed"
+  1 failed

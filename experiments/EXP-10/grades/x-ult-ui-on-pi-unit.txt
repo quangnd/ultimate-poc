@@ -1,0 +1,10 @@
+ ❯ tests/web/import-preview.test.ts (2 tests | 2 failed) 26ms
+     × importing a completed release still shows both finish dates, the delta and both slips 16ms
+     × replacing a completed release shows them the other way round 9ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+Expected: "Wed 10 Feb 2027 → Fri 1 Jan 2027 (all tasks done)"
+Received: "What would changeTasks: 0 added, 0 removed, 20 changedChanged APP-02 Build checkout flow screensStatus In progress → DoneChanged APP-03 Integrate diagnostics screen with firmware APIStatus To do → DoneChanged APP-04 Add offline modeStatus To do → DoneChanged APP-05 Gate: app integration c
+Expected: "Fri 1 Jan 2027 (all tasks done) → Wed 10 Feb 2027"
+Received: "What would changeTasks: 0 added, 0 removed, 20 changedChanged APP-02 Build checkout flow screensStatus Done → In progressChanged APP-03 Integrate diagnostics screen with firmware APIStatus Done → To doChanged APP-04 Add offline modeStatus Done → To doChanged APP-05 Gate: app integration c
+ Test Files  1 failed (1)
+      Tests  2 failed (2)

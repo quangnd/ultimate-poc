@@ -1,0 +1,10 @@
+ ❯ tests/web/import-preview.test.ts (2 tests | 2 failed) 26ms
+     × importing an all-done release still shows both finish dates, the delta and both slips (US-07) 16ms
+     × replacing an all-done release with an open one shows them too 9ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+Expected: "Wed 10 Feb 2027 → Fri 1 Jan 2027 (complete)"
+Received: " What changes Compared with the stored release. Readiness Not ready → Ready Gate fw-integrated : open → done Gate security-verified : open → done Gate app-integration : open → done Gate qa-complete : open → done Estimated finish Wed 10 Feb 2027 → Fri 1 Jan 2027 (all tasks done) -28 workin
+Expected: "Fri 1 Jan 2027 (complete) → Wed 10 Feb 2027"
+Received: " What changes Compared with the stored release. Readiness Ready → Not ready Gate fw-integrated : done → open Gate security-verified : done → open Gate app-integration : done → open Gate qa-complete : done → open Estimated finish Fri 1 Jan 2027 (all tasks done) → Wed 10 Feb 2027 +28 workin
+ Test Files  1 failed (1)
+      Tests  2 failed (2)

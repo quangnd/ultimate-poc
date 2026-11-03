@@ -1,0 +1,1262 @@
+diff --git a/e2e/import-preview.spec.ts b/e2e/import-preview.spec.ts
+new file mode 100644
+index 0000000..1647b8e
+--- /dev/null
++++ b/e2e/import-preview.spec.ts
+@@ -0,0 +1,70 @@
++import { readFile, writeFile } from 'node:fs/promises'
++import { join } from 'node:path'
++import { expect } from '@playwright/test'
++import { test } from './api'
++
++const SAMPLE = 'fixtures/release.json'
++
++// US-07 import preview: the firmware-delay scenario of fixtures/README.md. FW-03 goes from 5 to 8 working days, which
++// moves the estimated finish from Wed 10 Feb 2027 to Mon 15 Feb 2027 (+3 working days).
++test('the import preview shows the FW-03 delay before it is confirmed, then the dashboard shows the delayed finish', async ({ page, api }) => {
++  const summary = page.getByRole('region', { name: 'Summary' })
++  const preview = page.getByRole('region', { name: 'What would change' })
++
++  // The sample release is stored.
++  await writeFile(join(api.dataDir, 'release.json'), await readFile(SAMPLE, 'utf8'))
++  await page.goto('/')
++  await expect(summary).toContainText(/Estimated finish\s*Wed 10 Feb 2027/)
++
++  // The stored file itself changes nothing: the panel says so instead of listing empty sections.
++  await page.locator('input[type=file]').setInputFiles(SAMPLE)
++  await expect(preview).toContainText('This file matches the stored release.')
++  await expect(preview.getByRole('heading', { level: 3 })).toHaveCount(0)
++
++  // A file in which FW-03 has 8 working days instead of 5.
++  const sample = JSON.parse(await readFile(SAMPLE, 'utf8')) as { tasks: { id: string; estimateDays: number }[] }
++  sample.tasks.find((t) => t.id === 'FW-03')!.estimateDays = 8
++  await page.locator('input[type=file]').setInputFiles({
++    name: 'firmware-delay.json',
++    mimeType: 'application/json',
++    buffer: Buffer.from(JSON.stringify(sample, null, 2)),
++  })
++
++  // The panel shows what would change, and nothing is stored yet.
++  await expect(page.getByRole('heading', { name: /Replace the stored release with/ })).toBeVisible()
++  await expect(preview).toBeVisible()
++  await expect(preview).toContainText('Tasks: 0 added, 0 removed, 1 changed')
++  const fw03 = preview.getByRole('listitem').filter({ hasText: 'FW-03' }).first()
++  await expect(fw03).toContainText(/Estimate \(working days\)\s*5 → 8/)
++  await expect(preview).toContainText(/Estimated finish\s*Wed 10 Feb 2027 → Mon 15 Feb 2027\s*\+3 working days later/)
++  await expect(preview).toContainText(/Slip against the target\s*2 working days early → 1 working day late/)
++  await expect(preview).toContainText('Estimate, not a commitment')
++  await expect(preview).toContainText(/Not ready → Not ready\s*\(no change\)/)
++  const stored = (await (await page.request.get('/api/release')).json()) as { tasks: { id: string; estimateDays: number }[] }
++  expect(stored.tasks.find((t) => t.id === 'FW-03')?.estimateDays).toBe(5)
++
++  // Confirming stores the file; the dashboard shows the delayed finish.
++  await page.getByRole('button', { name: 'Replace stored release' }).click()
++  await expect(page.getByText('Imported firmware-delay.json.')).toBeVisible()
++  await expect(summary).toContainText(/Estimated finish\s*Mon 15 Feb 2027/)
++  await expect(preview).toHaveCount(0)
++})
++
++// An import in which every task is done: the dashboard says "Complete", but the preview still shows the forecast values.
++test('the import preview keeps the forecast figures when the imported release has every task done', async ({ page, api }) => {
++  const preview = page.getByRole('region', { name: 'What would change' })
++  await writeFile(join(api.dataDir, 'release.json'), await readFile(SAMPLE, 'utf8'))
++  await page.goto('/')
++
++  const sample = JSON.parse(await readFile(SAMPLE, 'utf8')) as { tasks: { status: string }[] }
++  for (const task of sample.tasks) task.status = 'done'
++  await page.locator('input[type=file]').setInputFiles({
++    name: 'all-done.json',
++    mimeType: 'application/json',
++    buffer: Buffer.from(JSON.stringify(sample, null, 2)),
++  })
++
++  await expect(preview).toContainText(/Estimated finish\s*Wed 10 Feb 2027 → Fri 1 Jan 2027 \(complete\)\s*-28 working days earlier/)
++  await expect(preview).toContainText(/Slip against the target\s*2 working days early → 30 working days early/)
++  await expect(preview).toContainText(/Not ready → Ready/)
++})
+diff --git a/src/domain/diff.ts b/src/domain/diff.ts
+new file mode 100644
+index 0000000..1f591ea
+--- /dev/null
++++ b/src/domain/diff.ts
+@@ -0,0 +1,196 @@
++/**
++ * What changes when one release document replaces another (US-07 import preview). Pure: no I/O, no clock, no randomness,
++ * inputs never mutated. The forecast and readiness come from `schedule` and `assessReadiness`, not from a second
++ * implementation. Precondition, not re-checked: both documents passed `validateDocument`.
++ *
++ * Every list is sorted in code-unit order (not `localeCompare`) and nothing depends on the order of tasks, predecessors
++ * or workstreams, so the result is the same for any reordering of either input.
++ */
++import { slipDays } from './calendar'
++import { assessReadiness } from './readiness'
++import { schedule } from './schedule'
++import { GATES, type Gate, type IsoDate, type ReleaseDocument, type Task } from './types'
++
++/** The task fields compared, in this order. `predecessors` is not a field here: links are reported in `links`. */
++export const TASK_FIELDS = ['title', 'stream', 'ownerRole', 'status', 'estimateDays', 'targetDate', 'gate'] as const
++export type TaskField = (typeof TASK_FIELDS)[number]
++
++export interface FieldChange {
++  field: TaskField
++  /** the value in `before`/`after`; an absent optional field (`targetDate`, `gate`) is null */
++  before: string | number | null
++  after: string | number | null
++}
++
++export interface TaskChange {
++  id: string
++  /** only fields whose value differs, in TASK_FIELDS order; never empty */
++  changes: FieldChange[]
++}
++
++/** A finish-to-start link: `to` lists `from` among its predecessors. */
++export interface Link {
++  from: string
++  to: string
++}
++
++export type GateState = 'missing' | 'open' | 'done'
++
++export interface GateChange {
++  gate: Gate
++  before: GateState
++  after: GateState
++}
++
++export interface ReleaseFieldChange {
++  field: 'startDate' | 'targetDate'
++  before: IsoDate | null
++  after: IsoDate | null
++}
++
++export interface ReleaseDiff {
++  /** true when release, workstreams, tasks and links all have no change */
++  unchanged: boolean
++  /** only differing fields, startDate before targetDate; an absent targetDate is null */
++  release: ReleaseFieldChange[]
++  /** stream names in one document but not the other, each sorted; a reordering alone is not a change */
++  workstreams: { added: string[]; removed: string[] }
++  tasks: {
++    /** ids only in `after`, sorted */
++    added: string[]
++    /** ids only in `before`, sorted */
++    removed: string[]
++    /** ids in both with at least one differing field, sorted by id */
++    changed: TaskChange[]
++  }
++  /** links only in `after` / only in `before` (including links of added or removed tasks), sorted by `to`, then `from` */
++  links: { added: Link[]; removed: Link[] }
++  readiness: {
++    /** `assessReadiness(...).ready` of each document */
++    before: boolean
++    after: boolean
++    /** one entry per mandatory gate whose state differs, in GATES order (src/domain/types.ts) */
++    gates: GateChange[]
++  }
++  forecast: {
++    /** `schedule(doc).finishDate` of each document */
++    beforeFinishDate: IsoDate
++    afterFinishDate: IsoDate
++    /** working days from the before finish date to the after finish date: positive = later, negative = earlier, 0 = same */
++    deltaWorkingDays: number
++    /** `schedule(doc).slipDays` of each document; null when that document has no release targetDate */
++    beforeSlipDays: number | null
++    afterSlipDays: number | null
++  }
++}
++
++/** Code-unit order, so the result does not depend on the runtime's locale (ADR-002 §5). */
++const compareStrings = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
++
++const sortedStrings = (values: Iterable<string>): string[] => [...values].sort(compareStrings)
++
++/** Values in `source` whose key is not in `other`. */
++function missingFrom<K, V>(source: Map<K, V>, other: Map<K, V>): V[] {
++  return [...source].filter(([key]) => !other.has(key)).map(([, value]) => value)
++}
++
++const compareLinks = (a: Link, b: Link): number => compareStrings(a.to, b.to) || compareStrings(a.from, b.from)
++
++/** The set of (predecessor, successor) pairs. The key is JSON, so no id can make two different pairs collide. */
++function linksOf(doc: ReleaseDocument): Map<string, Link> {
++  const links = new Map<string, Link>()
++  for (const task of doc.tasks) {
++    for (const from of task.predecessors) links.set(JSON.stringify([from, task.id]), { from, to: task.id })
++  }
++  return links
++}
++
++/** An absent optional field is null. */
++const fieldValue = (task: Task, field: TaskField): string | number | null => task[field] ?? null
++
++function gateState(doc: ReleaseDocument, gate: Gate): GateState {
++  const task = doc.tasks.find((t) => t.gate === gate)
++  return task === undefined ? 'missing' : task.status === 'done' ? 'done' : 'open'
++}
++
++export function diffReleases(before: ReleaseDocument, after: ReleaseDocument): ReleaseDiff {
++  const beforeTasks = new Map(before.tasks.map((t) => [t.id, t]))
++  const afterTasks = new Map(after.tasks.map((t) => [t.id, t]))
++
++  const added = sortedStrings(afterTasks.keys()).filter((id) => !beforeTasks.has(id))
++  const removed = sortedStrings(beforeTasks.keys()).filter((id) => !afterTasks.has(id))
++  const changed: TaskChange[] = []
++  for (const id of sortedStrings(beforeTasks.keys())) {
++    const was = beforeTasks.get(id)!
++    const now = afterTasks.get(id)
++    if (now === undefined) continue
++    const changes: FieldChange[] = []
++    for (const field of TASK_FIELDS) {
++      const b = fieldValue(was, field)
++      const a = fieldValue(now, field)
++      if (b !== a) changes.push({ field, before: b, after: a })
++    }
++    if (changes.length > 0) changed.push({ id, changes })
++  }
++
++  const beforeLinks = linksOf(before)
++  const afterLinks = linksOf(after)
++  const links = {
++    added: missingFrom(afterLinks, beforeLinks).sort(compareLinks),
++    removed: missingFrom(beforeLinks, afterLinks).sort(compareLinks),
++  }
++
++  const release: ReleaseFieldChange[] = []
++  for (const field of ['startDate', 'targetDate'] as const) {
++    const b = before.release[field] ?? null
++    const a = after.release[field] ?? null
++    if (b !== a) release.push({ field, before: b, after: a })
++  }
++
++  const beforeStreams = new Set(before.workstreams)
++  const afterStreams = new Set(after.workstreams)
++  const workstreams = {
++    added: sortedStrings(afterStreams).filter((name) => !beforeStreams.has(name)),
++    removed: sortedStrings(beforeStreams).filter((name) => !afterStreams.has(name)),
++  }
++
++  const beforeForecast = schedule(before)
++  const afterForecast = schedule(after)
++  const gates: GateChange[] = []
++  for (const gate of GATES) {
++    const b = gateState(before, gate)
++    const a = gateState(after, gate)
++    if (b !== a) gates.push({ gate, before: b, after: a })
++  }
++  // slipDays(target, finish) is positive when `finish` is later, so (before, after) gives +n for "n working days later".
++  // `|| 0` keeps a result of -0 out of the output.
++  const deltaWorkingDays = slipDays(beforeForecast.finishDate, afterForecast.finishDate) || 0
++
++  return {
++    unchanged:
++      release.length === 0 &&
++      workstreams.added.length === 0 &&
++      workstreams.removed.length === 0 &&
++      added.length === 0 &&
++      removed.length === 0 &&
++      changed.length === 0 &&
++      links.added.length === 0 &&
++      links.removed.length === 0,
++    release,
++    workstreams,
++    tasks: { added, removed, changed },
++    links,
++    readiness: {
++      before: assessReadiness(before, beforeForecast).ready,
++      after: assessReadiness(after, afterForecast).ready,
++      gates,
++    },
++    forecast: {
++      beforeFinishDate: beforeForecast.finishDate,
++      afterFinishDate: afterForecast.finishDate,
++      deltaWorkingDays,
++      beforeSlipDays: beforeForecast.slipDays ?? null,
++      afterSlipDays: afterForecast.slipDays ?? null,
++    },
++  }
++}
+diff --git a/src/web/App.tsx b/src/web/App.tsx
+index e8439e6..77b6dc8 100644
+--- a/src/web/App.tsx
++++ b/src/web/App.tsx
+@@ -118,6 +118,7 @@ export function App() {
+           <ImportPanel
+             state={importing}
+             stored={state.kind === 'ready' ? summarize(state.dashboard.doc) : state.kind === 'invalid' ? 'unusable' : undefined}
++            storedDocument={state.kind === 'ready' ? state.dashboard.doc : undefined}
+             unsavedChanges={unsavedChanges}
+             onConfirm={confirmImport}
+             onChooseAnother={chooseFile}
+diff --git a/src/web/ImportPanel.tsx b/src/web/ImportPanel.tsx
+index add78fa..f6b077a 100644
+--- a/src/web/ImportPanel.tsx
++++ b/src/web/ImportPanel.tsx
+@@ -1,9 +1,10 @@
+ /** The import review: what a chosen file contains, or why it can't be imported, before anything is stored (US-07). */
+ import { useEffect, useRef } from 'react'
+ import { ProblemText } from './Editor'
++import { ImportPreview } from './ImportPreview'
+ import { formatBytes, MAX_IMPORT_BYTES, type ImportCheck, type ImportOutcome, type ReleaseSummary } from './transfer'
+ import { formatDate, STATUS_LABEL } from './view'
+-import { STATUSES } from '../domain/types'
++import { STATUSES, type ReleaseDocument } from '../domain/types'
+ 
+ /** One import from choosing a file to its end; `idle` shows nothing. */
+ export type ImportState =
+@@ -17,6 +18,8 @@ interface Props {
+   state: Exclude<ImportState, { kind: 'idle' }>
+   /** What is stored now: a summary, `unusable` when the stored file fails validation, undefined when nothing is stored. */
+   stored?: ReleaseSummary | 'unusable'
++  /** The stored release itself, for the preview of what an import changes; undefined when nothing usable is stored. */
++  storedDocument?: ReleaseDocument
+   /** Unsaved changes in the editor that an import would discard. */
+   unsavedChanges: number
+   onConfirm: () => void
+@@ -28,7 +31,7 @@ interface Props {
+ 
+ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+ 
+-export function ImportPanel({ state, stored, unsavedChanges, onConfirm, onChooseAnother, onClose, onReload }: Props) {
++export function ImportPanel({ state, stored, storedDocument, unsavedChanges, onConfirm, onChooseAnother, onClose, onReload }: Props) {
+   const ref = useRef<HTMLElement>(null)
+   // Each new step takes focus, so a keyboard or screen-reader user lands on the question or the refusal.
+   useEffect(() => ref.current?.focus(), [state.kind, state.name])
+@@ -48,7 +51,7 @@ export function ImportPanel({ state, stored, unsavedChanges, onConfirm, onChoose
+   if (state.kind === 'checked' && state.check.kind !== 'ready') return <Refusal {...{ ref, name: state.name, onChooseAnother, onClose, onReload }} reason={state.check} where="browser" />
+   if (state.kind === 'refused') return <Refusal {...{ ref, name: state.name, onChooseAnother, onClose, onReload }} reason={state.outcome} where="server" />
+ 
+-  const { summary } = state.check as Extract<ImportCheck, { kind: 'ready' }>
++  const { summary, document } = state.check as Extract<ImportCheck, { kind: 'ready' }>
+   const busy = state.kind === 'importing'
+   return (
+     <section className="notice banner import-review" ref={ref} tabIndex={-1} aria-labelledby="import-title" aria-busy={busy}>
+@@ -69,6 +72,7 @@ export function ImportPanel({ state, stored, unsavedChanges, onConfirm, onChoose
+       ) : (
+         <p className="muted">Nothing is stored yet, so nothing is replaced.</p>
+       )}
++      {storedDocument && <ImportPreview stored={storedDocument} imported={document} unsavedChanges={unsavedChanges} />}
+       {unsavedChanges > 0 && (
+         <p className="import-warn" role="note">
+           <strong>Your unsaved edits will be discarded.</strong> The editor has {plural(unsavedChanges, 'unsaved change')};
+diff --git a/src/web/ImportPreview.tsx b/src/web/ImportPreview.tsx
+new file mode 100644
+index 0000000..096f96b
+--- /dev/null
++++ b/src/web/ImportPreview.tsx
+@@ -0,0 +1,239 @@
++/** The import preview (US-07): what replacing the stored release with the chosen file would change. */
++import { useMemo } from 'react'
++import { diffReleases, type FieldChange, type GateState, type ReleaseDiff, type TaskField } from '../domain/diff'
++import type { ReleaseDocument, Status } from '../domain/types'
++import { deltaText, formatDate, slipText, slipTone, STATUS_LABEL } from './view'
++
++const FIELD_LABEL: Record<TaskField, string> = {
++  title: 'Title',
++  stream: 'Stream',
++  ownerRole: 'Owner role',
++  status: 'Status',
++  estimateDays: 'Estimate (working days)',
++  targetDate: 'Target date',
++  gate: 'Gate',
++}
++
++const GATE_STATE_LABEL: Record<GateState, string> = { missing: 'Not defined', open: 'Not done', done: 'Done' }
++
++const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
++
++interface Props {
++  /** What is stored now, never the editor's unsaved draft. */
++  stored: ReleaseDocument
++  imported: ReleaseDocument
++  /** Unsaved changes in the editor, which this preview does not include. */
++  unsavedChanges: number
++}
++
++export function ImportPreview({ stored, imported, unsavedChanges }: Props) {
++  const diff = useMemo(() => diffReleases(stored, imported), [stored, imported])
++  return (
++    <section className="import-preview" aria-labelledby="import-preview-title">
++      <h2 id="import-preview-title">What would change</h2>
++      {unsavedChanges > 0 && (
++        <p className="muted">
++          This compares the file with the <strong>stored</strong> release, not with the {plural(unsavedChanges, 'unsaved edit')} in the
++          editor.
++        </p>
++      )}
++      {diff.unchanged ? (
++        <p>
++          <strong>This file matches the stored release.</strong> No task, link, date or stream differs, so replacing it changes nothing.
++        </p>
++      ) : (
++        <>
++          <TaskChanges diff={diff} stored={stored} imported={imported} />
++          <LinkChanges diff={diff} />
++          <ReleaseChanges diff={diff} />
++          <ReadinessChange diff={diff} />
++          <ForecastChange diff={diff} stored={stored} imported={imported} />
++        </>
++      )}
++    </section>
++  )
++}
++
++function Block({ title, tag, children }: { title: string; tag?: React.ReactNode; children: React.ReactNode }) {
++  return (
++    <div className="preview-block">
++      <h3>
++        {title}
++        {tag}
++      </h3>
++      {children}
++    </div>
++  )
++}
++
++function Id({ id }: { id: string }) {
++  return <span className="id">{id}</span>
++}
++
++const KIND_LABEL = { added: 'Added', removed: 'Removed', changed: 'Changed' } as const
++
++function Kind({ kind }: { kind: keyof typeof KIND_LABEL }) {
++  return <span className={`change-kind change-${kind}`}>{KIND_LABEL[kind]}</span>
++}
++
++/** "old → new": the old value muted, the new one strong. The text reads the same without the styling. */
++function FromTo({ before, after }: { before: React.ReactNode; after: React.ReactNode }) {
++  return (
++    <span className="from-to">
++      <span className="change-old">{before}</span> → <strong>{after}</strong>
++    </span>
++  )
++}
++
++/** A task field value as the dashboard shows it: status words, formatted dates, "none" for an absent optional field. */
++function fieldValue({ field, before, after }: FieldChange, side: 'before' | 'after'): React.ReactNode {
++  const value = side === 'before' ? before : after
++  if (value === null) return <span className="muted">none</span>
++  if (value === '') return <span className="muted">empty</span>
++  if (field === 'status') return STATUS_LABEL[value as Status]
++  if (field === 'targetDate') return formatDate(value as string)
++  return String(value)
++}
++
++function TaskChanges({ diff, stored, imported }: { diff: ReleaseDiff; stored: ReleaseDocument; imported: ReleaseDocument }) {
++  const { added, removed, changed } = diff.tasks
++  if (added.length + removed.length + changed.length === 0) return null
++  const titles = (doc: ReleaseDocument) => new Map(doc.tasks.map((t) => [t.id, t.title]))
++  const storedTitles = titles(stored)
++  const importedTitles = titles(imported)
++  return (
++    <Block title={`Tasks: ${added.length} added, ${removed.length} removed, ${changed.length} changed`}>
++      <ul className="change-list">
++        {added.map((id) => (
++          <li key={`added-${id}`}>
++            <Kind kind="added" /> <Id id={id} /> <span>{importedTitles.get(id)}</span>
++          </li>
++        ))}
++        {removed.map((id) => (
++          <li key={`removed-${id}`}>
++            <Kind kind="removed" /> <Id id={id} /> <span>{storedTitles.get(id)}</span>
++          </li>
++        ))}
++        {changed.map(({ id, changes }) => (
++          <li key={`changed-${id}`}>
++            <Kind kind="changed" /> <Id id={id} /> <span>{importedTitles.get(id)}</span>
++            <ul className="field-changes">
++              {changes.map((change) => (
++                <li key={change.field}>
++                  <span className="change-field">{FIELD_LABEL[change.field]}</span>{' '}
++                  <FromTo before={fieldValue(change, 'before')} after={fieldValue(change, 'after')} />
++                </li>
++              ))}
++            </ul>
++          </li>
++        ))}
++      </ul>
++    </Block>
++  )
++}
++
++function LinkChanges({ diff }: { diff: ReleaseDiff }) {
++  const { added, removed } = diff.links
++  if (added.length + removed.length === 0) return null
++  const item = (kind: 'added' | 'removed', { from, to }: { from: string; to: string }) => (
++    <li key={`${kind}-${JSON.stringify([from, to])}`}>
++      <Kind kind={kind} /> <Id id={from} /> → <Id id={to} />
++    </li>
++  )
++  return (
++    <Block title={`Links: ${added.length} added, ${removed.length} removed`}>
++      <ul className="change-list">
++        {added.map((link) => item('added', link))}
++        {removed.map((link) => item('removed', link))}
++      </ul>
++    </Block>
++  )
++}
++
++function ReleaseChanges({ diff }: { diff: ReleaseDiff }) {
++  const { release, workstreams } = diff
++  if (release.length + workstreams.added.length + workstreams.removed.length === 0) return null
++  const date = (value: string | null) => (value === null ? <span className="muted">none</span> : formatDate(value))
++  return (
++    <Block title="Release dates and streams">
++      <ul className="change-list">
++        {release.map((c) => (
++          <li key={c.field}>
++            <span className="change-field">{c.field === 'startDate' ? 'Start date' : 'Target date'}</span>{' '}
++            <FromTo before={date(c.before)} after={date(c.after)} />
++          </li>
++        ))}
++        {workstreams.added.length > 0 && (
++          <li>
++            <Kind kind="added" /> <span>{plural(workstreams.added.length, 'stream')}: {workstreams.added.join(', ')}</span>
++          </li>
++        )}
++        {workstreams.removed.length > 0 && (
++          <li>
++            <Kind kind="removed" /> <span>{plural(workstreams.removed.length, 'stream')}: {workstreams.removed.join(', ')}</span>
++          </li>
++        )}
++      </ul>
++    </Block>
++  )
++}
++
++function Verdict({ ready }: { ready: boolean }) {
++  return <span className={ready ? 'verdict-chip verdict-chip-ready' : 'verdict-chip verdict-chip-not-ready'}>{ready ? 'Ready' : 'Not ready'}</span>
++}
++
++function ReadinessChange({ diff }: { diff: ReleaseDiff }) {
++  const { before, after, gates } = diff.readiness
++  return (
++    <Block title="Readiness">
++      <p>
++        <Verdict ready={before} /> → <Verdict ready={after} />
++        {before === after && <span className="muted"> (no change)</span>}
++      </p>
++      {gates.length > 0 && (
++        <ul className="change-list">
++          {gates.map(({ gate, before: was, after: now }) => (
++            <li key={gate}>
++              <span className="change-field">
++                Gate <code>{gate}</code>
++              </span>{' '}
++              <FromTo before={GATE_STATE_LABEL[was]} after={GATE_STATE_LABEL[now]} />
++            </li>
++          ))}
++        </ul>
++      )}
++    </Block>
++  )
++}
++
++function ForecastChange({ diff, stored, imported }: { diff: ReleaseDiff; stored: ReleaseDocument; imported: ReleaseDocument }) {
++  const f = diff.forecast
++  // The dashboard says "Complete" instead of a date when nothing is left to do. The preview keeps the forecast values
++  // (US-07) and marks such a side "complete", so a release that finishes earlier because it is all done still shows how much.
++  const beforeDone = stored.tasks.every((t) => t.status === 'done')
++  const afterDone = imported.tasks.every((t) => t.status === 'done')
++  const finish = (done: boolean, date: string) => (
++    <>
++      {formatDate(date)}
++      {done && <span className="muted"> (complete)</span>}
++    </>
++  )
++  const slip = (value: number | null) =>
++    value === null ? <span className="muted">no target</span> : <span className={`slip slip-${slipTone(value)}`}>{slipText(value)}</span>
++  return (
++    <Block title="Forecast" tag={<span className="estimate-tag">Estimate, not a commitment</span>}>
++      <ul className="change-list">
++        <li>
++          <span className="change-field">Estimated finish</span>{' '}
++          <FromTo before={finish(beforeDone, f.beforeFinishDate)} after={finish(afterDone, f.afterFinishDate)} />
++          <span className={`delta ${f.deltaWorkingDays > 0 ? 'delta-later' : ''}`}>{deltaText(f.deltaWorkingDays)}</span>
++        </li>
++        {(f.beforeSlipDays !== null || f.afterSlipDays !== null) && (
++          <li>
++            <span className="change-field">Slip against the target</span> <FromTo before={slip(f.beforeSlipDays)} after={slip(f.afterSlipDays)} />
++          </li>
++        )}
++      </ul>
++    </Block>
++  )
++}
+diff --git a/src/web/styles.css b/src/web/styles.css
+index 893c180..fde1772 100644
+--- a/src/web/styles.css
++++ b/src/web/styles.css
+@@ -416,3 +416,22 @@ a.button.quiet:hover { background: var(--soft); }
+ .import-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+ .import-done { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; padding: 12px 16px 12px 24px; }
+ @media (max-width: 560px) { .import-facts { grid-template-columns: 1fr 1fr; gap: 12px 24px; } }
++
++/* Import preview: what the chosen file would change (US-07) */
++.import-preview { display: grid; gap: 12px; }
++.import-preview h2 { font-size: 16px; font-weight: 600; }
++.preview-block { display: grid; gap: 4px; }
++.preview-block h3 { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
++.preview-block h3 .estimate-tag { margin: 0 0 0 8px; }
++.change-list, .field-changes { list-style: none; padding: 0; display: grid; gap: 4px; }
++.change-list > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
++.change-kind { min-width: 64px; font-size: 12px; font-weight: 600; }
++.change-added { color: var(--good); }
++.change-removed { color: var(--bad); }
++.change-changed { color: var(--info); }
++.field-changes { flex-basis: 100%; padding-left: 72px; }
++.field-changes > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
++.change-field { color: var(--muted); }
++.change-old { color: var(--muted); }
++.from-to { overflow-wrap: anywhere; }
++@media (max-width: 560px) { .field-changes { padding-left: 16px; } }
+diff --git a/src/web/view.ts b/src/web/view.ts
+index 8c127bf..7bc35c2 100644
+--- a/src/web/view.ts
++++ b/src/web/view.ts
+@@ -105,6 +105,13 @@ export function slipText(slip: number): string {
+   return 'on target'
+ }
+ 
++/** A move of the forecast finish in working days, positive = later (the import preview): "+3 working days later". */
++export function deltaText(delta: number): string {
++  if (delta > 0) return `+${days(delta)} later`
++  if (delta < 0) return `-${days(-delta)} earlier`
++  return 'same finish date'
++}
++
+ export type SlipTone = 'late' | 'early' | 'on-target'
+ 
+ export function slipTone(slip: number): SlipTone {
+diff --git a/tests/domain/diff.test.ts b/tests/domain/diff.test.ts
+new file mode 100644
+index 0000000..9ac7153
+--- /dev/null
++++ b/tests/domain/diff.test.ts
+@@ -0,0 +1,563 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { assessReadiness } from '../../src/domain/readiness'
++import { schedule } from '../../src/domain/schedule'
++import { diffReleases, TASK_FIELDS, type ReleaseDiff } from '../../src/domain/diff'
++import { GATES, type Gate, type ReleaseDocument, type Status, type Task } from '../../src/domain/types'
++import { validateDocument } from '../../src/domain/validate'
++
++// Hand computations use day0 = Mon 2026-01-05 (day 0 Mon 01-05, 1 Tue 01-06, 2 Wed 01-07, 3 Thu 01-08, 4 Fri 01-09,
++// 5 Mon 01-12) unless a test says otherwise.
++
++const START = '2026-01-05'
++
++type Extra = { status?: Status; targetDate?: string; gate?: Gate; title?: string; ownerRole?: string }
++
++function task(id: string, stream: string, estimateDays: number, predecessors: string[] = [], extra: Extra = {}): Task {
++  return { id, title: id, stream, ownerRole: 'owner', status: 'todo', estimateDays, predecessors, ...extra }
++}
++
++/** Builds a document and checks the diff's precondition: it must pass `validateDocument`. */
++function doc(tasks: Task[], release: { startDate?: string; targetDate?: string } = {}, workstreams = ['FW', 'SPS', 'Security', 'App', 'QA']): ReleaseDocument {
++  const built: ReleaseDocument = { schemaVersion: 1, release: { startDate: START, ...release }, workstreams, tasks }
++  const result = validateDocument(built)
++  if (!result.ok) throw new Error(`test document is invalid: ${result.errors.map((e) => e.message).join('; ')}`)
++  return built
++}
++
++/**
++ * A (FW, 2 days) -> B (SPS, 1 day); four 0-day gates: fw-integrated after A, security-verified after B, app-integration
++ * done, qa-complete after both. A runs day 0-1, B day 2, so the release finishes on day 2 = Wed 2026-01-07.
++ */
++function baseTasks(): Task[] {
++  return [
++    task('A', 'FW', 2),
++    task('B', 'SPS', 1, ['A']),
++    task('G-FW', 'FW', 0, ['A'], { gate: 'fw-integrated' }),
++    task('G-SEC', 'Security', 0, ['B'], { gate: 'security-verified' }),
++    task('G-APP', 'App', 0, [], { gate: 'app-integration', status: 'done' }),
++    task('G-QA', 'QA', 0, ['G-FW', 'G-SEC'], { gate: 'qa-complete' }),
++  ]
++}
++
++const base = () => doc(baseTasks())
++
++/** The task without its `gate` property (an absent optional field, not `gate: undefined`). */
++function withoutGate(t: Task): Task {
++  const { gate: _gate, ...rest } = t
++  return rest
++}
++
++/** The base document with a 1-day qa-complete task `Q` instead of G-QA; a task without a gate must have 1 day or more. */
++function qaDoc(gate: boolean, extra: Task[] = []): ReleaseDocument {
++  const q = task('Q', 'QA', 1, ['G-FW', 'G-SEC'], gate ? { gate: 'qa-complete' } : {})
++  return doc([...baseTasks().filter((t) => t.id !== 'G-QA'), q, ...extra])
++}
++
++/** The base tasks with one task replaced by `patch(task)`. */
++function edited(id: string, patch: (t: Task) => Task): ReleaseDocument {
++  return doc(baseTasks().map((t) => (t.id === id ? patch(t) : t)))
++}
++
++function fixture(): ReleaseDocument {
++  const result = validateDocument(JSON.parse(readFileSync('fixtures/release.json', 'utf8')))
++  if (!result.ok) throw new Error('fixture must be valid')
++  return result.document
++}
++
++const EMPTY_LISTS = {
++  release: [],
++  workstreams: { added: [], removed: [] },
++  tasks: { added: [], removed: [], changed: [] },
++  links: { added: [], removed: [] },
++}
++
++describe('1. identity', () => {
++  it.each([
++    ['the base document', base()],
++    ['the sample release', fixture()],
++  ])('reports no change between %s and itself or a deep copy of it', (_name, d) => {
++    for (const other of [d, structuredClone(d)]) {
++      const diff = diffReleases(d, other)
++      expect(diff.unchanged).toBe(true)
++      expect(diff).toMatchObject(EMPTY_LISTS)
++      expect(diff.readiness.gates).toEqual([])
++      expect(diff.readiness.before).toBe(diff.readiness.after)
++      expect(diff.forecast.deltaWorkingDays).toBe(0)
++      expect(diff.forecast.beforeFinishDate).toBe(diff.forecast.afterFinishDate)
++      expect(diff.forecast.beforeSlipDays).toBe(diff.forecast.afterSlipDays)
++    }
++  })
++})
++
++describe('2. tasks added and removed', () => {
++  const sortedIds = ['Y', 'Z', 'a', 'b'] // code-unit order; localeCompare would give a, b, Y, Z
++
++  it('matches tasks by id and sorts added and removed in code-unit order', () => {
++    const before = doc([...baseTasks(), task('b', 'FW', 1), task('Z', 'FW', 1), task('X', 'FW', 1)])
++    const after = doc([...baseTasks(), task('X', 'FW', 1), task('a', 'FW', 1), task('B-', 'FW', 1)])
++    const diff = diffReleases(before, after)
++    expect(diff.tasks.added).toEqual(['B-', 'a'])
++    expect(diff.tasks.removed).toEqual(['Z', 'b'])
++    expect(diff.tasks.changed).toEqual([])
++  })
++
++  it('does not use the locale for the order', () => {
++    const withIds = doc([...baseTasks(), ...['b', 'a', 'Z', 'Y'].map((id) => task(id, 'FW', 1))])
++    expect(diffReleases(base(), withIds).tasks.added).toEqual(sortedIds)
++    expect(diffReleases(withIds, base()).tasks.removed).toEqual(sortedIds)
++  })
++
++  it('never lists an added or removed task as changed, even when its fields differ from nothing', () => {
++    const after = doc([...baseTasks(), task('NEW', 'FW', 3, ['A'], { status: 'in_progress', targetDate: '2026-02-02' })])
++    const diff = diffReleases(base(), after)
++    expect(diff.tasks.added).toEqual(['NEW'])
++    expect(diff.tasks.changed).toEqual([])
++    const back = diffReleases(after, base())
++    expect(back.tasks.removed).toEqual(['NEW'])
++    expect(back.tasks.changed).toEqual([])
++  })
++
++  it('treats ids like constructor and __proto__ as ordinary ids', () => {
++    const odd = doc([...baseTasks(), task('constructor', 'FW', 1), task('__proto__', 'FW', 1, ['constructor']), task('toString', 'FW', 1)])
++    const diff = diffReleases(base(), odd)
++    expect(diff.tasks.added).toEqual(['__proto__', 'constructor', 'toString'])
++    expect(diff.links.added).toEqual([{ from: 'constructor', to: '__proto__' }])
++    expect(diffReleases(odd, odd).unchanged).toBe(true)
++  })
++})
++
++describe('3. tasks changed', () => {
++  it('lists TASK_FIELDS in the specified order', () => {
++    expect(TASK_FIELDS).toEqual(['title', 'stream', 'ownerRole', 'status', 'estimateDays', 'targetDate', 'gate'])
++  })
++
++  it('reports one FieldChange per differing field, in TASK_FIELDS order', () => {
++    // A differs in all seven fields; the gate moves from G-FW to A, so G-FW changes too.
++    const after = doc(
++      baseTasks().map((t) => {
++        if (t.id === 'G-FW') return { ...withoutGate(t), estimateDays: 1 } // a task without a gate needs 1 day or more
++        if (t.id !== 'A') return t
++        return {
++          // written in a different key order on purpose
++          gate: 'fw-integrated',
++          targetDate: '2026-01-09',
++          estimateDays: 4,
++          status: 'in_progress',
++          ownerRole: 'lead',
++          stream: 'SPS',
++          title: 'Renamed A',
++          predecessors: [],
++          id: 'A',
++        }
++      }),
++    )
++    const diff = diffReleases(base(), after)
++    expect(diff.tasks.changed).toEqual([
++      {
++        id: 'A',
++        changes: [
++          { field: 'title', before: 'A', after: 'Renamed A' },
++          { field: 'stream', before: 'FW', after: 'SPS' },
++          { field: 'ownerRole', before: 'owner', after: 'lead' },
++          { field: 'status', before: 'todo', after: 'in_progress' },
++          { field: 'estimateDays', before: 2, after: 4 },
++          { field: 'targetDate', before: null, after: '2026-01-09' },
++          { field: 'gate', before: null, after: 'fw-integrated' },
++        ],
++      },
++      {
++        id: 'G-FW',
++        changes: [
++          { field: 'estimateDays', before: 0, after: 1 },
++          { field: 'gate', before: 'fw-integrated', after: null },
++        ],
++      },
++    ])
++  })
++
++  it('reports only the fields that differ', () => {
++    const diff = diffReleases(base(), edited('B', (t) => ({ ...t, estimateDays: 6 })))
++    expect(diff.tasks.changed).toEqual([{ id: 'B', changes: [{ field: 'estimateDays', before: 1, after: 6 }] }])
++  })
++
++  it('reports an absent optional field as null: adding a targetDate is null -> date, removing a gate is gate -> null', () => {
++    const withTarget = edited('A', (t) => ({ ...t, targetDate: '2026-01-09' }))
++    expect(diffReleases(base(), withTarget).tasks.changed).toEqual([
++      { id: 'A', changes: [{ field: 'targetDate', before: null, after: '2026-01-09' }] },
++    ])
++    expect(diffReleases(withTarget, base()).tasks.changed).toEqual([
++      { id: 'A', changes: [{ field: 'targetDate', before: '2026-01-09', after: null }] },
++    ])
++
++    expect(diffReleases(qaDoc(true), qaDoc(false)).tasks.changed).toEqual([
++      { id: 'Q', changes: [{ field: 'gate', before: 'qa-complete', after: null }] },
++    ])
++    expect(diffReleases(qaDoc(false), qaDoc(true)).tasks.changed).toEqual([
++      { id: 'Q', changes: [{ field: 'gate', before: null, after: 'qa-complete' }] },
++    ])
++  })
++
++  it('does not report a task whose only difference is in predecessors', () => {
++    const diff = diffReleases(base(), edited('G-QA', (t) => ({ ...t, predecessors: ['G-FW'] })))
++    expect(diff.tasks.changed).toEqual([])
++    expect(diff.links.removed).toEqual([{ from: 'G-SEC', to: 'G-QA' }])
++    expect(diff.unchanged).toBe(false)
++  })
++
++  it('sorts changed tasks by id in code-unit order', () => {
++    const before = doc([...baseTasks(), task('b', 'FW', 1), task('B1', 'FW', 1), task('a', 'FW', 1)])
++    const after = doc(before.tasks.map((t) => (['b', 'B1', 'a', 'A'].includes(t.id) ? { ...t, estimateDays: t.estimateDays + 1 } : t)))
++    expect(diffReleases(before, after).tasks.changed.map((c) => c.id)).toEqual(['A', 'B1', 'a', 'b'])
++  })
++
++  it('compares empty strings as values, not as absent', () => {
++    const diff = diffReleases(base(), edited('A', (t) => ({ ...t, title: '' })))
++    expect(diff.tasks.changed[0]!.changes).toEqual([{ field: 'title', before: 'A', after: '' }])
++  })
++})
++
++describe('4. links', () => {
++  it('reports pairs present only in after as added and only in before as removed', () => {
++    const before = base()
++    const after = edited('G-QA', (t) => ({ ...t, predecessors: ['G-FW', 'B'] })) // drops G-SEC, adds B
++    const diff = diffReleases(before, after)
++    expect(diff.links).toEqual({ added: [{ from: 'B', to: 'G-QA' }], removed: [{ from: 'G-SEC', to: 'G-QA' }] })
++    expect(diffReleases(after, before).links).toEqual({ added: [{ from: 'G-SEC', to: 'G-QA' }], removed: [{ from: 'B', to: 'G-QA' }] })
++  })
++
++  it('includes every link of an added or removed task', () => {
++    const extra = task('N', 'FW', 1, ['B', 'A'])
++    const after = doc([...baseTasks().map((t) => (t.id === 'G-QA' ? { ...t, predecessors: [...t.predecessors, 'N'] } : t)), extra])
++    const diff = diffReleases(base(), after)
++    expect(diff.links.added).toEqual([
++      { from: 'N', to: 'G-QA' },
++      { from: 'A', to: 'N' },
++      { from: 'B', to: 'N' },
++    ])
++    expect(diff.links.removed).toEqual([])
++    expect(diffReleases(after, base()).links.removed).toEqual(diff.links.added)
++  })
++
++  it('sorts by to, then from, in code-unit order', () => {
++    const before = doc([task('a', 'FW', 1), task('B', 'FW', 1), task('c', 'FW', 1), task('Z', 'FW', 1), task('m', 'FW', 1)])
++    const after = doc([
++      task('a', 'FW', 1),
++      task('B', 'FW', 1),
++      task('c', 'FW', 1, ['m', 'a', 'Z', 'B']),
++      task('Z', 'FW', 1, ['a']),
++      task('m', 'FW', 1, ['B']),
++    ])
++    expect(diffReleases(before, after).links.added).toEqual([
++      { from: 'a', to: 'Z' },
++      { from: 'B', to: 'c' },
++      { from: 'Z', to: 'c' },
++      { from: 'a', to: 'c' },
++      { from: 'm', to: 'c' },
++      { from: 'B', to: 'm' },
++    ])
++  })
++
++  it('tells apart links whose ids concatenate to the same text', () => {
++    const ids = ['a', 'bc', 'ab', 'c']
++    const withLink = (to: string, from: string) => doc(ids.map((id) => task(id, 'FW', 1, id === to ? [from] : [])))
++    const diff = diffReleases(withLink('bc', 'a'), withLink('c', 'ab'))
++    expect(diff.links).toEqual({ added: [{ from: 'ab', to: 'c' }], removed: [{ from: 'a', to: 'bc' }] })
++  })
++
++  it('does not count the order of ids inside predecessors as a change', () => {
++    const before = edited('G-QA', (t) => ({ ...t, predecessors: ['G-FW', 'G-SEC'] }))
++    const after = edited('G-QA', (t) => ({ ...t, predecessors: ['G-SEC', 'G-FW'] }))
++    const diff = diffReleases(before, after)
++    expect(diff.unchanged).toBe(true)
++    expect(diff.links).toEqual({ added: [], removed: [] })
++  })
++})
++
++describe('5. release and workstreams', () => {
++  it('lists startDate and targetDate when they differ, startDate first, an absent target as null', () => {
++    const none = base()
++    const dated = doc(baseTasks(), { startDate: '2026-01-12', targetDate: '2026-02-13' })
++    expect(diffReleases(none, dated).release).toEqual([
++      { field: 'startDate', before: '2026-01-05', after: '2026-01-12' },
++      { field: 'targetDate', before: null, after: '2026-02-13' },
++    ])
++    expect(diffReleases(dated, none).release).toEqual([
++      { field: 'startDate', before: '2026-01-12', after: '2026-01-05' },
++      { field: 'targetDate', before: '2026-02-13', after: null },
++    ])
++  })
++
++  it('lists only the field that differs', () => {
++    const a = doc(baseTasks(), { targetDate: '2026-02-13' })
++    const b = doc(baseTasks(), { targetDate: '2026-02-20' })
++    expect(diffReleases(a, b).release).toEqual([{ field: 'targetDate', before: '2026-02-13', after: '2026-02-20' }])
++    const c = doc(baseTasks(), { startDate: '2026-01-06', targetDate: '2026-02-13' })
++    expect(diffReleases(a, c).release).toEqual([{ field: 'startDate', before: '2026-01-05', after: '2026-01-06' }])
++  })
++
++  it('compares workstream names as sets, each list sorted in code-unit order', () => {
++    const before = doc(baseTasks(), {}, ['FW', 'SPS', 'Security', 'App', 'QA', 'old', 'Old2'])
++    const after = doc(baseTasks(), {}, ['QA', 'new', 'App', 'Security', 'SPS', 'FW', 'Zed', 'alpha'])
++    expect(diffReleases(before, after).workstreams).toEqual({ added: ['Zed', 'alpha', 'new'], removed: ['Old2', 'old'] })
++  })
++
++  it('does not count a reordering of workstreams as a change', () => {
++    const diff = diffReleases(base(), doc(baseTasks(), {}, ['QA', 'App', 'Security', 'SPS', 'FW']))
++    expect(diff.workstreams).toEqual({ added: [], removed: [] })
++    expect(diff.unchanged).toBe(true)
++  })
++})
++
++describe('6. unchanged', () => {
++  // Each case is checked in both directions below, so it covers the matching "removed" form too.
++  const cases: [string, ReleaseDocument][] = [
++    ['a release start date', doc(baseTasks(), { startDate: '2026-01-06' })],
++    ['a release target date', doc(baseTasks(), { targetDate: '2026-02-13' })],
++    ['a workstream name', doc(baseTasks(), {}, ['FW', 'SPS', 'Security', 'App', 'QA', 'Ops'])],
++    ['a task', doc([...baseTasks(), task('N', 'FW', 1)])],
++    ['a task field', edited('A', (t) => ({ ...t, title: 'other' }))],
++    ['a link', edited('G-QA', (t) => ({ ...t, predecessors: [...t.predecessors, 'B'] }))],
++  ]
++
++  it.each(cases)('is false when the documents differ by %s', (_name, after) => {
++    const diff = diffReleases(base(), after)
++    expect(diff.unchanged).toBe(false)
++    expect(diffReleases(after, base()).unchanged).toBe(false)
++  })
++
++  it('is true exactly when release, workstreams, tasks and links are all empty', () => {
++    for (const [, after] of cases) {
++      const d: ReleaseDiff = diffReleases(base(), after)
++      const empty =
++        d.release.length === 0 &&
++        d.workstreams.added.length === 0 &&
++        d.workstreams.removed.length === 0 &&
++        d.tasks.added.length === 0 &&
++        d.tasks.removed.length === 0 &&
++        d.tasks.changed.length === 0 &&
++        d.links.added.length === 0 &&
++        d.links.removed.length === 0
++      expect(d.unchanged).toBe(empty)
++    }
++  })
++})
++
++describe('7. readiness and gates', () => {
++  const allDone = () => doc(baseTasks().map((t) => ({ ...t, status: 'done' as const })))
++
++  it('reports ready of each document as assessReadiness(doc, schedule(doc)).ready', () => {
++    for (const [before, after] of [
++      [base(), allDone()],
++      [allDone(), base()],
++      [fixture(), fixture()],
++    ] as const) {
++      const diff = diffReleases(before, after)
++      expect(diff.readiness.before).toBe(assessReadiness(before, schedule(before)).ready)
++      expect(diff.readiness.after).toBe(assessReadiness(after, schedule(after)).ready)
++    }
++    expect(diffReleases(base(), allDone()).readiness).toMatchObject({ before: false, after: true })
++    expect(diffReleases(allDone(), base()).readiness).toMatchObject({ before: true, after: false })
++  })
++
++  it('lists every gate whose state differs, in GATES order', () => {
++    // base: fw-integrated open, security-verified open, app-integration done, qa-complete open
++    const gates = diffReleases(base(), allDone()).readiness.gates
++    expect(gates).toEqual([
++      { gate: 'fw-integrated', before: 'open', after: 'done' },
++      { gate: 'security-verified', before: 'open', after: 'done' },
++      { gate: 'qa-complete', before: 'open', after: 'done' },
++    ])
++    expect(gates.map((g) => g.gate)).toEqual(GATES.filter((g) => gates.some((c) => c.gate === g)))
++    expect(diffReleases(allDone(), base()).readiness.gates.map((g) => [g.before, g.after])).toEqual([
++      ['done', 'open'],
++      ['done', 'open'],
++      ['done', 'open'],
++    ])
++  })
++
++  it('reports missing for a gate no task has', () => {
++    const noApp = doc(baseTasks().filter((t) => t.id !== 'G-APP'))
++    expect(diffReleases(base(), noApp).readiness.gates).toEqual([{ gate: 'app-integration', before: 'done', after: 'missing' }])
++    expect(diffReleases(noApp, base()).readiness.gates).toEqual([{ gate: 'app-integration', before: 'missing', after: 'done' }])
++    const noQa = doc(baseTasks().filter((t) => t.id !== 'G-QA'))
++    expect(diffReleases(noQa, base()).readiness.gates).toEqual([{ gate: 'qa-complete', before: 'missing', after: 'open' }])
++  })
++
++  it('does not list a gate that moves to another task in the same state', () => {
++    // qa-complete moves from the open Q to the open Q2
++    const diff = diffReleases(qaDoc(true), qaDoc(false, [task('Q2', 'QA', 0, ['Q'], { gate: 'qa-complete' })]))
++    expect(diff.readiness.gates).toEqual([])
++    expect(diff.tasks.changed.map((c) => c.id)).toEqual(['Q'])
++    expect(diff.tasks.added).toEqual(['Q2'])
++  })
++
++  it('lists a gate that moves to a task in another state', () => {
++    const diff = diffReleases(qaDoc(true), qaDoc(false, [task('Q2', 'QA', 0, [], { gate: 'qa-complete', status: 'done' })]))
++    expect(diff.readiness.gates).toEqual([{ gate: 'qa-complete', before: 'open', after: 'done' }])
++  })
++})
++
++describe('8. forecast', () => {
++  it('reports the finish dates and slip days of schedule(doc), and a null slip without a release target', () => {
++    const before = doc(baseTasks(), { targetDate: '2026-01-09' })
++    const after = doc(baseTasks().map((t) => (t.id === 'A' ? { ...t, estimateDays: 5 } : t)), { targetDate: '2026-01-09' })
++    const diff = diffReleases(before, after)
++    expect(diff.forecast).toEqual({
++      beforeFinishDate: schedule(before).finishDate,
++      afterFinishDate: schedule(after).finishDate,
++      deltaWorkingDays: 3,
++      beforeSlipDays: schedule(before).slipDays ?? null,
++      afterSlipDays: schedule(after).slipDays ?? null,
++    })
++    // before: finish day 2 = Wed 01-07, 2 working days early; after: day 5 = Mon 01-12, 1 working day late
++    expect(diff.forecast).toMatchObject({ beforeFinishDate: '2026-01-07', afterFinishDate: '2026-01-12', beforeSlipDays: -2, afterSlipDays: 1 })
++
++    const noTarget = diffReleases(base(), after)
++    expect(noTarget.forecast).toMatchObject({ beforeSlipDays: null, afterSlipDays: 1 })
++    expect(diffReleases(after, base()).forecast).toMatchObject({ beforeSlipDays: 1, afterSlipDays: null })
++    expect(diffReleases(base(), base()).forecast).toMatchObject({ beforeSlipDays: null, afterSlipDays: null })
++  })
++
++  it('counts working days: positive when the after finish is later, negative when earlier, 0 when equal', () => {
++    const slower = edited('A', (t) => ({ ...t, estimateDays: 5 })) // finish Mon 01-12, 3 working days after Wed 01-07
++    const faster = edited('A', (t) => ({ ...t, estimateDays: 1 })) // A day 0, B day 1: finish Tue 01-06
++    expect(diffReleases(base(), slower).forecast.deltaWorkingDays).toBe(3)
++    expect(diffReleases(slower, base()).forecast.deltaWorkingDays).toBe(-3)
++    expect(diffReleases(base(), faster).forecast.deltaWorkingDays).toBe(-1)
++    expect(diffReleases(faster, base()).forecast.deltaWorkingDays).toBe(1)
++    expect(diffReleases(base(), edited('A', (t) => ({ ...t, title: 'x' }))).forecast.deltaWorkingDays).toBe(0)
++  })
++
++  it('does not report -0', () => {
++    expect(Object.is(diffReleases(base(), base()).forecast.deltaWorkingDays, 0)).toBe(true)
++  })
++
++  it('measures the firmware-delay scenario of the sample: FW-03 5 -> 8 days is +3 working days, -2 -> +1 against the target', () => {
++    const before = fixture()
++    const after = { ...before, tasks: before.tasks.map((t) => (t.id === 'FW-03' ? { ...t, estimateDays: 8 } : t)) }
++    const diff = diffReleases(before, after)
++    expect(diff.tasks.changed).toEqual([{ id: 'FW-03', changes: [{ field: 'estimateDays', before: 5, after: 8 }] }])
++    expect(diff.forecast).toEqual({
++      beforeFinishDate: '2027-02-10',
++      afterFinishDate: '2027-02-15',
++      deltaWorkingDays: 3,
++      beforeSlipDays: -2,
++      afterSlipDays: 1,
++    })
++    expect(diff.readiness).toEqual({ before: false, after: false, gates: [] })
++  })
++
++  it('holds when the documents have different start dates', () => {
++    // Same plan one week later: Mon 01-12 start, finish day 2 = Wed 01-14: 5 working days after Wed 01-07.
++    const week = doc(baseTasks(), { startDate: '2026-01-12' })
++    expect(diffReleases(base(), week).forecast).toMatchObject({ beforeFinishDate: '2026-01-07', afterFinishDate: '2026-01-14', deltaWorkingDays: 5 })
++    expect(diffReleases(week, base()).forecast.deltaWorkingDays).toBe(-5)
++    // A Saturday start begins on the following Monday (ADR-002 §1): the finish is the same as for Mon 01-12.
++    const saturday = doc(baseTasks(), { startDate: '2026-01-10' })
++    expect(diffReleases(week, saturday).forecast.deltaWorkingDays).toBe(0)
++    expect(diffReleases(week, saturday).unchanged).toBe(false) // but the start date still differs
++    expect(diffReleases(base(), saturday).forecast).toMatchObject({ afterFinishDate: '2026-01-14', deltaWorkingDays: 5 })
++  })
++
++  it('handles a document whose tasks are all done (finish is the working day before day 0)', () => {
++    const done = doc(baseTasks().map((t) => ({ ...t, status: 'done' as const })))
++    const diff = diffReleases(base(), done)
++    expect(diff.forecast).toMatchObject({ beforeFinishDate: '2026-01-07', afterFinishDate: '2026-01-02', deltaWorkingDays: -3 })
++  })
++})
++
++describe('9. pure and order-independent', () => {
++  /** Deep freeze: a write to an input would throw in strict mode (ES modules are strict). */
++  function deepFreeze<T>(value: T): T {
++    if (typeof value === 'object' && value !== null) {
++      Object.values(value).forEach(deepFreeze)
++      Object.freeze(value)
++    }
++    return value
++  }
++
++  const pair = (): [ReleaseDocument, ReleaseDocument] => {
++    const before = fixture()
++    const after = fixture()
++    after.tasks = after.tasks.filter((t) => t.id !== 'APP-04' && t.id !== 'QA-01')
++    for (const t of after.tasks) t.predecessors = t.predecessors.filter((p) => p !== 'APP-04' && p !== 'QA-01')
++    after.tasks.find((t) => t.id === 'FW-03')!.estimateDays = 8
++    after.tasks.find((t) => t.id === 'FW-04')!.predecessors = ['FW-02', 'FW-03']
++    after.tasks.find((t) => t.id === 'SEC-02')!.status = 'done'
++    after.tasks.push(task('ZZ-1', 'App', 2, ['APP-01', 'FW-02']), task('AA-1', 'QA', 1))
++    before.workstreams.push('Legacy')
++    after.workstreams = ['QA', 'Ops', 'FW', 'SPS', 'App', 'Security']
++    after.release = { startDate: '2027-01-11' }
++    return [validated(before), validated(after)]
++  }
++  const validated = (d: ReleaseDocument) => doc(d.tasks, d.release, d.workstreams)
++
++  it('has the pair exercising every part of the result', () => {
++    const [before, after] = pair()
++    const diff = diffReleases(before, after)
++    expect(diff.unchanged).toBe(false)
++    expect(diff.release.length).toBeGreaterThan(0)
++    expect(diff.workstreams.added.length + diff.workstreams.removed.length).toBeGreaterThan(0)
++    expect(diff.tasks.added.length).toBeGreaterThan(0)
++    expect(diff.tasks.removed.length).toBeGreaterThan(0)
++    expect(diff.tasks.changed.length).toBeGreaterThan(0)
++    expect(diff.links.added.length).toBeGreaterThan(0)
++    expect(diff.links.removed.length).toBeGreaterThan(0)
++  })
++
++  it('does not mutate its inputs and is repeatable', () => {
++    const [before, after] = pair()
++    const snapshot = structuredClone([before, after])
++    deepFreeze(before)
++    deepFreeze(after)
++    const first = diffReleases(before, after)
++    expect(diffReleases(before, after)).toEqual(first)
++    expect([before, after]).toEqual(snapshot)
++  })
++
++  it('does not share arrays or objects with its inputs', () => {
++    const [before, after] = pair()
++    const diff = diffReleases(before, after)
++    const copy = structuredClone(diff)
++    // writing to the result must not reach the inputs (the inputs are compared with a snapshot taken first)
++    const snapshot = structuredClone([before, after])
++    diff.tasks.added.push('x')
++    diff.workstreams.added.push('x')
++    diff.links.added.push({ from: 'x', to: 'y' })
++    expect([before, after]).toEqual(snapshot)
++    expect(copy.tasks.added).not.toContain('x')
++  })
++
++  /** Deterministic permutations of an array (no randomness): 0 reversed, 1 rotated by three, 2 odd positions first. */
++  const permute = <T>(items: readonly T[], k: number): T[] =>
++    k === 0
++      ? [...items].reverse()
++      : k === 1
++        ? [...items.slice(3), ...items.slice(0, 3)]
++        : [...items.filter((_, i) => i % 2 === 1), ...items.filter((_, i) => i % 2 === 0)]
++
++  it('gives the same result for any order of tasks, predecessors and workstreams in either document', () => {
++    const [before, after] = pair()
++    const expected = diffReleases(before, after)
++    const shuffle = (d: ReleaseDocument, k: number): ReleaseDocument => ({
++      ...d,
++      workstreams: permute(d.workstreams, k),
++      tasks: permute(
++        d.tasks.map((t) => ({ ...t, predecessors: permute(t.predecessors, k) })),
++        k,
++      ),
++    })
++    for (let k = 0; k < 3; k++) {
++      expect(diffReleases(shuffle(before, k), after)).toEqual(expected)
++      expect(diffReleases(before, shuffle(after, k))).toEqual(expected)
++      expect(diffReleases(shuffle(before, k), shuffle(after, (k + 1) % 3))).toEqual(expected)
++    }
++  })
++
++  it('gives the same result when predecessors are reversed', () => {
++    const [before, after] = pair()
++    const reversed = (d: ReleaseDocument): ReleaseDocument => ({ ...d, tasks: d.tasks.map((t) => ({ ...t, predecessors: [...t.predecessors].reverse() })) })
++    expect(diffReleases(reversed(before), reversed(after))).toEqual(diffReleases(before, after))
++  })
++})
+diff --git a/tests/web/import-preview.test.ts b/tests/web/import-preview.test.ts
+new file mode 100644
+index 0000000..8c0f859
+--- /dev/null
++++ b/tests/web/import-preview.test.ts
+@@ -0,0 +1,31 @@
++import { readFileSync } from 'node:fs'
++import { createElement } from 'react'
++import { renderToStaticMarkup } from 'react-dom/server'
++import { describe, expect, it } from 'vitest'
++import type { ReleaseDocument } from '../../src/domain/types'
++import { ImportPreview } from '../../src/web/ImportPreview'
++
++const sample = JSON.parse(readFileSync('fixtures/release.json', 'utf8')) as ReleaseDocument
++const allDone: ReleaseDocument = { ...structuredClone(sample), tasks: sample.tasks.map((t) => ({ ...structuredClone(t), status: 'done' as const })) }
++
++/** The preview as text: tags dropped, entities left as they are (none of the asserted strings contain any). */
++const text = (stored: ReleaseDocument, imported: ReleaseDocument) =>
++  renderToStaticMarkup(createElement(ImportPreview, { stored, imported, unsavedChanges: 0 }))
++    .replace(/<[^>]+>/g, ' ')
++    .replace(/\s+/g, ' ')
++
++describe('import preview forecast when a release has nothing left to do', () => {
++  it('importing an all-done release still shows both finish dates, the delta and both slips (US-07)', () => {
++    const shown = text(sample, allDone)
++    expect(shown).toContain('Wed 10 Feb 2027 → Fri 1 Jan 2027 (complete)')
++    expect(shown).toContain('-28 working days earlier')
++    expect(shown).toContain('2 working days early → 30 working days early')
++  })
++
++  it('replacing an all-done release with an open one shows them too', () => {
++    const shown = text(allDone, sample)
++    expect(shown).toContain('Fri 1 Jan 2027 (complete) → Wed 10 Feb 2027')
++    expect(shown).toContain('+28 working days later')
++    expect(shown).toContain('30 working days early → 2 working days early')
++  })
++})
+diff --git a/tests/web/view.test.ts b/tests/web/view.test.ts
+index a54d223..d8801ff 100644
+--- a/tests/web/view.test.ts
++++ b/tests/web/view.test.ts
+@@ -1,7 +1,7 @@
+ import { readFileSync } from 'node:fs'
+ import { describe, expect, it } from 'vitest'
+ import { validateDocument } from '../../src/domain/validate'
+-import { buildDashboard, formatDate, slipText } from '../../src/web/view'
++import { buildDashboard, deltaText, formatDate, slipText } from '../../src/web/view'
+ 
+ function fixture() {
+   const result = validateDocument(JSON.parse(readFileSync('fixtures/release.json', 'utf8')))
+@@ -43,4 +43,11 @@ describe('formatting', () => {
+     expect(slipText(-2)).toBe('2 working days early')
+     expect(slipText(0)).toBe('on target')
+   })
++
++  it('states a finish moving in working days, positive meaning later', () => {
++    expect(deltaText(3)).toBe('+3 working days later')
++    expect(deltaText(1)).toBe('+1 working day later')
++    expect(deltaText(-2)).toBe('-2 working days earlier')
++    expect(deltaText(0)).toBe('same finish date')
++  })
+ })

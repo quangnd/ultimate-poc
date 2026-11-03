@@ -1,0 +1,5 @@
+# EXP-10 provenance: file mtimes UTC
+2026-11-02T23:54:19Z hidden/diff.hidden.test.ts 6ddfddc0af9eec05
+2026-11-02T23:53:09Z ref/src/domain/diff.ts a5043a81bbc77388
+# reference check 2026-11-02T23:5xZ: without diff.ts -> file fails; with reference -> 22/22; tsc 0
+# mutants (each caught): localeCompare 1 fail, index delta 2, predecessors-as-field 13, missing-as-open 1, links-of-new-tasks-dropped 3

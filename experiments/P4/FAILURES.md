@@ -18,6 +18,8 @@ This log continues `experiments/P3/FAILURES.md` and `experiments/P3/GATE_SUMMARY
 | F28 | #15503 (#49) | 15774 (2026-11-02 17:14:41), 9 s after the generation-4 host swap | Claude Code upstream error (relay `AggregateError`) | next input (#52's timing message) | none |
 | F29 | #15503 (#49) | 16176 and 16182 (2026-11-02 17:31:36 and 17:32:37), during a `subagent` start of PR reviewer #16117 | Claude Code upstream error (relay `AggregateError`); the watchdog retry failed too | manual resume by #52; state checked first (`git status`, no PR existed yet, reviewer answer in the inbox) | none: no step repeated; reviewer #16117 had been started once |
 
+EXP-10 (#60, `experiments/EXP-10/RUN-20261103-01.md`), 2026-11-02 23:50Z – 2026-11-03 00:20Z, with fix B on the host core: no failure in any arm or the coordinator (0 `stopReason: error` entries in #16926, #17099 and #17391; 0 errors in the Pi arm's JSON). Nothing to add. It made 49 Claude Code relay calls, too few to count toward the fix-B re-count (≥300).
+
 F25–F28 were added by #49 (`experiments/P4/FAULT_INJECTION.md` part B), which re-counted every `stopReason: error` entry up to 2026-11-02 17:16Z: 36 failed calls in 29 incidents.
 
 All F1–F21 rows with the text `relay failure AggregateError:` share the root cause below.
