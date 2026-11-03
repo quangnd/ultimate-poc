@@ -1,6 +1,6 @@
 # P4 follow-up B: network fix for the Claude Code relay `AggregateError`
 
-Status: **APPLIED 2026-11-02 23:42:52Z** (option A, chosen by the PO on the decision card). Outcome: **PARTIAL** until the 24 h re-count in section 6.
+Status: **APPLIED 2026-11-02 23:42:52Z** (option A, chosen by the PO on the decision card). Outcome: **PASS** by the 24 h re-count (section 7), under the rule set in advance.
 Owner: coordinator branch #16450, for PO approval of 2026-11-03 (follow-up B). Root cause: `FAILURES.md`, section "Root cause".
 Markers: (M) measured here, (D) derived/inferred.
 
@@ -123,3 +123,15 @@ Baseline query: the same command with `2026-11-01T18:15:00` / `2026-11-02T18:15:
 - Any `relay failure AggregateError` under the flag: **not effective**; keep the inner error codes for diagnosis. A timeout above 2 s points at the network, not happy-eyeballs; then consider option 2 or 3 of `FAILURES.md`.
 
 Confound (D): network conditions differ between days. One quiet day lowers errors without any fix, so a busy-hour burst like 13Z on 2026-11-02 is the stronger test.
+
+## 7. Re-count result (M, run by @ultimate #52 at 2026-11-03T23:50Z, automation A3)
+
+- **Flag held the whole window:** supervisor 63720 and core 63722 both run `--network-family-autoselection-attempt-timeout=2000`; the core started 2026-11-02T23:42:47Z (`ps -o lstart=`), before the window opened, and was not relaunched.
+- **After (section 6 query, window 2026-11-02T23:42:52Z to 2026-11-03T23:42:52Z):** **448 Claude Code calls, 0 relay `AggregateError`, 0 errors of any kind** (`errorMessage` empty on all 448).
+- **Baseline, same query:** 1036 calls, 25 relay errors (2.4%), 29 errors of any kind.
+- **Calls per hour (UTC) in the window:** 23h 56, 00h 189, 04h 34, 09h 82, 10h 87. The 00Z hour (189 calls) is a busy hour comparable to the 13Z burst on 2026-11-02.
+- **Cross-check:** `ultimate.search('relay failure AggregateError')` finds no new error entry after the relaunch, only quotes of the phrase in docs, tool output and messages.
+- **Judgement (rule set before the data):** 0 errors over ≥300 calls means **effective, PASS**.
+- **Strength of the evidence:** at the baseline rate of 2.4%, 448 calls would be expected to show about 11 errors; P(0 | 2.4%) ≈ (1 − 0.024)^448 ≈ 2 × 10⁻⁵. The day-to-day network confound (D) remains, but a chance-only explanation is very unlikely.
+- **Side effects:** none observed in 24 h. EXP-10, EXP-11 and EXP-12 ran under the flag with green checks; EXP-12's hand-started previews used the same flag.
+- **Rollback** is unchanged (section 5). The fix lasts only while Ultimate is started with the flag; a plain `ultimate` start removes it.
