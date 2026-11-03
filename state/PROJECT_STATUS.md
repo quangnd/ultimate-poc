@@ -2,8 +2,8 @@
 
 Updated: 2026-11-03
 Current phase: **P4 accepted (selectively reuse); targeted follow-ups B, E, A, C in progress, not a new phase.**
-Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62).
-Last verified commit: `e5f0b8d` (PR #63, EXP-11 records, CI green).
+Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62). C is done (HazAT/ultimate#68; rrl-e2e note PR #65, PO-approved; experiments/P4/FOLLOWUP_C.md).
+Last verified commit: `ee888c7` (PR #65, rrl-e2e orphan note, CI green).
 Active issues: P3 #33 (EXP-06/EXP-01/Dream), still open. P4 issues #45–#49 closed. Follow-ups E #60 and A #62 closed.
 Result of follow-up A #62 (EXP-11, `experiments/EXP-11/RUN-20261103-01.md`):
 - **Design:** 24 gate memories written by a coverage rule (ADRs and clarifications, gates P0–P4, experiment findings), index 34 → 55; then two memory-only arms. A2's 10 unseen questions were written by an independent GPT evaluator and frozen (sha256) before the memories were drafted.
@@ -24,7 +24,7 @@ Result of P4 #49:
   - Provider failures: 36 calls in 29 incidents, all recovered, with no duplicate effects. 14 needed a deliberate resume (9 by @ultimate, 5 by the human for 429s), and the 429 waits totalled 15.2 h.
 P4 earlier: #47/#48 (EXP-07/08, PR #55): every arm passed 34/34. Plain Pi was ~2.2× faster and 1.7× cheaper (model-confounded), and the same-model single worker cost 3.6× less than orchestration. #46 (EXP-09, PR #52): memory-only recall 5/10, memory plus docs 10/10. #45 CI enabled (PR #50).
 Blockers: none.
-Next action: the remaining follow-ups (B re-count after 2026-11-03 23:43Z, then C), each as its own issue started by @ultimate.
+Next action: B's 24 h re-count after 2026-11-03 23:43Z (automation A3), then the closing evaluation report (retain / change / unproven).
 Decisions taken: P0 (PR per issue, coordinator merges; model families kept; A/B on anthropic opus-5-5). P0 gate: ADR-001/002 accepted, GitHub merge only, lander checks only and no push. P1 gate: ADR-002 clarifications 1–5 and the driving-chain limit accepted. Project `.ultimate/` setup trusted (2026-11-01). P3 gate: "Start P4 as proposed, with CI on".
 P4 gate (PO, 2026-11-03): verdict accepted, selectively reuse. Follow-ups in order B, E, A, C, as targeted tasks: B = the network fix, applied as a host CLI flag (PR #59); E = EXP-10 (#60, done); A = the memory-gap fix and re-run; C = report the orphaned-Vite defect upstream. Not approved: 429 auto-Play. Default delivery flow: one worker, an independent cross-family reviewer, and lander/CI checks.
 
