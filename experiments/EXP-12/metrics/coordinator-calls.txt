@@ -1,0 +1,69 @@
+# EXP-12 coordinator (#92) per-call trace, all four runs
+# Captured 2026-11-03 ~10:21Z by coordinator #19308 from each preview's state.sqlite (read-only), before the homes were deleted.
+# Recovered verbatim from #19308 entry 19907. Per call: context (input+cacheRead+cacheWrite), cacheWrite, output, then tool calls (arguments cut to 230 chars) or text (cut to 160).
+
+===== t1-O
+1 ctx=25517 cw=14982 out=197 bash({"command":"cd /private/tmp/exp12/runs/t1-O/worktrees/92 && git log -1 --format=%H && git status --short && ls src/domain tests/domain && grep -n \"export\" src/domain/schedule.ts src/domain/readiness.ts | head -40","timeout":20})
+2 ctx=26074 cw=557 out=314 read({"path":"/private/tmp/exp12/runs/t1-O/worktrees/92/src/domain/schedule.ts","limit":40}) | read({"path":"/private/tmp/exp12/runs/t1-O/worktrees/92/src/domain/readiness.ts","limit":45}) | read({"path":"/private/tmp/exp12/runs/t1-O/worktrees/92/.ultimate/skills/rrl-e2e/SKILL.md"})
+3 ctx=29204 cw=3130 out=216 bash({"command":"cd /private/tmp/exp12/runs/t1-O/worktrees/92 && cat fixtures/README.md | head -60; grep -n \"slip\\|clarification 1\" -i docs/decisions/ADR-002-scheduling-semantics.md | head -20","timeout":20})
+4 ctx=30485 cw=1281 out=1672 subagent({"action":"start","agent":"worker","isolate":"worktree","background":true,"task":"Goal: add a pure domain function `lateTasks` to the Release Readiness Lab (TypeScript) repo so the operator can see which open tasks the forecast pu)
+5 ctx=45797 cw=15312 out=17 TEXT:Waiting for worker #153 to build and report.
+6 ctx=45901 cw=15414 out=13 TEXT:Still waiting for worker #153.
+7 ctx=47565 cw=1666 out=153 bash({"command":"cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git log --oneline 7f4ca08..HEAD && git diff --stat 7f4ca08..HEAD && cat src/domain/late.ts","timeout":20})
+8 ctx=48611 cw=18126 out=1061 TEXT:Looks right. Starting the reviewer. | subagent({"action":"start","agent":"reviewer","background":true,"task":"Review commit range 7f4ca08e3354993fe79ab1d712aec6f33e4c4a2f..baa1ceab5f06985f15658508333865760214a68f in /private/tmp/exp12/runs/t1-O/worktrees/153 (read-only; do not)
+9 ctx=63322 cw=14711 out=14 TEXT:Waiting for reviewer #275.
+10 ctx=63723 cw=15112 out=266 bash({"command":"cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git status --short && git rev-parse HEAD && npm run typecheck >/tmp/tc153.log 2>&1; echo typecheck=$?; npm test >/tmp/t153.log 2>&1; echo test=$?; grep -E \"Tests|Test F)
+11 ctx=64021 cw=15410 out=333 bash({"command":"cd /private/tmp/exp12/runs/t1-O/worktrees/153 && ( eval \"$(node -e 'const n=require(\"node:net\"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,\"127.0.0.1\",()=>{const p=s.address().port;s.close(()=>r(p))}))
+12 ctx=64425 cw=404 out=808 TEXT:I've added the late-task report: `lateTasks(doc)` in `src/domain/late.ts`, with tests in `tests/domain/late.test.ts`. The reviewer approved it in the first roun
+13 ctx=66113 cw=1686 out=149 TEXT:@ultimate's summary matches my report: same SHAs and patch path, and the exit codes are from my own re-run of `baa1cea`. There's nothing to correct, so I'm done
+===== t1-L
+1 ctx=26057 cw=15522 out=199 bash({"command":"cd /private/tmp/exp12/runs/t1-L/worktrees/92 && git log -1 --format=%H && git status --short && ls src/domain tests/domain && grep -n \"export\" src/domain/schedule.ts src/domain/readiness.ts | head -40","timeout":20})
+2 ctx=26608 cw=551 out=207 read({"path":"/private/tmp/exp12/runs/t1-L/worktrees/92/src/domain/schedule.ts","limit":40}) | read({"path":"/private/tmp/exp12/runs/t1-L/worktrees/92/.ultimate/skills/rrl-e2e/SKILL.md"})
+3 ctx=28661 cw=2053 out=1644 TEXT:Base is ab6b914. Starting the worker. | subagent({"action":"start","agent":"worker","isolate":"worktree","background":true,"task":"Implement one GitHub-style issue in the Release Readiness Lab repo (TypeScript), in your worktree, as one focused commit. Base commit: ab6b9140941d3)
+4 ctx=44539 cw=15878 out=109 TEXT:I've started a worker (#147) to build the late-task report in its own worktree, branched from base `ab6b9140941d3fb47c1ed9676887993854340d11`. I'm waiting for i
+5 ctx=44724 cw=18977 out=82 TEXT:Nothing has changed, so I'm not sending an update. Worker #147 is still building; its report will wake me, and then the review step starts.
+6 ctx=45730 cw=1008 out=149 bash({"command":"cd /private/tmp/exp12/runs/t1-L/worktrees/147 && git log --oneline ab6b914..HEAD && git diff --stat ab6b914..HEAD && cat src/domain/late.ts","timeout":20})
+7 ctx=46745 cw=18084 out=905 TEXT:Clean. Starting the reviewer. | subagent({"action":"start","agent":"reviewer","background":true,"task":"Read-only review of commit range ab6b9140941d3fb47c1ed9676887993854340d11..8e5a6ea9f2f43094eb42a55f9b75c7881854de45 in worktree /private/tmp/exp12/runs/t1-L/worktrees/)
+8 ctx=61840 cw=15095 out=290 TEXT:Worker #147 committed `8e5a6ea9f2f43094eb42a55f9b75c7881854de45` on top of base `ab6b9140941d3fb47c1ed9676887993854340d11`. It adds only `src/domain/late.ts` an
+9 ctx=62477 cw=15732 out=281 bash({"command":"cd /private/tmp/exp12/runs/t1-L/worktrees/147 && git status --short && npm run typecheck >/tmp/tc147.log 2>&1; echo \"typecheck=$?\"; npm test >/tmp/t147.log 2>&1; echo \"test=$?\"; grep -E \"Test Files|Tests \" /tmp/t)
+10 ctx=62746 cw=16001 out=209 codemode({"code":"const r = await ultimate.search(\"test:e2e\", {conversationId:147, limit:20}); return r.map(e=>JSON.stringify(e).slice(0,100)+' ... '+JSON.stringify(e).match(/(\\d+ passed[^\"\\\\]{0,40}|exit[^\"\\\\]{0,30})/g)?.slice(0,4)
+11 ctx=63396 cw=650 out=135 codemode({"code":"const r = await ultimate.search(\"test:e2e\", {conversationId:147, limit:20}); const s=JSON.stringify(r[2]); const i=s.indexOf('passed'); return s.slice(Math.max(0,i-300), i+300);"})
+12 ctx=63756 cw=1010 out=143 codemode({"code":"const r = await ultimate.search(\"7 passed\", {conversationId:147, limit:5}); return r.map(e=>{const s=JSON.stringify(e); const i=s.indexOf('7 passed'); return s.slice(Math.max(0,i-200), i+150)});"})
+13 ctx=64520 cw=1125 out=800 TEXT:The late-task report is built and the reviewer approved it on the first round. Nothing was submitted, landed, merged or pushed, and GitHub was not used.
+
+- **Ba
+14 ctx=65849 cw=3403 out=107 TEXT:That summary matches my report, so there's nothing to add or correct.
+
+The run is finished: worker commit `8e5a6ea` on base `ab6b914`, approved by the reviewer.
+===== t2-O
+1 ctx=26390 cw=15855 out=162 bash({"command":"cd /private/tmp/exp12/runs/t2-O/worktrees/92 && git log --oneline -1 && git status --short && ls src/domain tests/domain && cat .ultimate/skills/rrl-e2e/SKILL.md | head -60"})
+2 ctx=27737 cw=1347 out=1892 TEXT:Base is 7f4ca08. Starting the worker with a self-contained brief. | subagent({"action":"start","agent":"worker","isolate":"worktree","background":true,"task":"Implement one issue in the Release Readiness Lab repo (TypeScript), in your worktree, as one focused commit. Do not push, merge, submit, or use gh/G)
+3 ctx=43760 cw=16023 out=65 TEXT:I've started worker #141 in its own worktree, from base `7f4ca08`. I'm waiting for its report. After that, a reviewer will check the worker's commit range again
+4 ctx=43944 cw=16205 out=22 TEXT:Still waiting on worker #141. Its answer will wake me.
+5 ctx=45714 cw=1772 out=154 bash({"command":"cd /private/tmp/exp12/runs/t2-O/worktrees/141 && git log --oneline 7f4ca08..HEAD && git diff --stat 7f4ca08..HEAD && git status --short && cat src/domain/whatif.ts"})
+6 ctx=47079 cw=19342 out=1237 TEXT:The diff is clean and stays in scope. Starting the reviewer. | subagent({"action":"start","agent":"reviewer","background":true,"task":"Read-only review of commit range 7f4ca08..928ed041a94069bf3816c155322e874a5d3a377a in the git repository at /private/tmp/exp12/runs/t2-O/worktrees/141 (Release Readine)
+7 ctx=62360 cw=15281 out=139 TEXT:Worker #141 finished commit `928ed04`. I read its diff: it adds only `src/domain/whatif.ts` and `tests/domain/whatif.test.ts`, and calls `schedule`, `assessRead
+8 ctx=62712 cw=17031 out=465 bash({"command":"cd /private/tmp/exp12/runs/t2-O/worktrees/141 && git rev-parse HEAD && git status --short; npm run typecheck >/tmp/tc141.log 2>&1; echo \"typecheck=$?\"; npm test >/tmp/t141.log 2>&1; echo \"test=$?\"; grep -E \"Tests|)
+9 ctx=63240 cw=16161 out=173 bash({"command":"cd /private/tmp/exp12/runs/t2-O/worktrees/141 && git format-patch 7f4ca08..928ed04 -o /tmp/rrl-whatif-patch"})
+10 ctx=63411 cw=171 out=716 TEXT:The delay what-if (`delayImpact`) is built and reviewed, and all three test runs pass. Nothing was submitted, landed, merged or pushed.
+
+- **Base SHA:** `7f4ca0
+11 ctx=64943 cw=1530 out=74 TEXT:@ultimate's relay matches my report, so nothing changes on my side. The delay what-if work is finished and nothing is waiting on me.
+===== t2-L
+1 ctx=26933 cw=16398 out=168 bash({"command":"cd /private/tmp/exp12/runs/t2-L/worktrees/92 && git rev-parse HEAD && git status --short && ls src/domain tests/domain && cat .ultimate/skills/rrl-e2e/SKILL.md | head -60"})
+2 ctx=28282 cw=1349 out=235 bash({"command":"cd /private/tmp/exp12/runs/t2-L/worktrees/92 && grep -n \"export\" src/domain/schedule.ts src/domain/readiness.ts src/domain/calendar.ts && grep -n \"drivingChain\\|import\\|sample\" tests/domain/readiness.test.ts | he)
+3 ctx=29587 cw=1305 out=210 bash({"command":"cd /private/tmp/exp12/runs/t2-L/worktrees/92 && sed -n 1,60p src/domain/schedule.ts && grep -n \"fixtures\\|import\" tests/domain/schedule.test.ts | head"})
+4 ctx=30865 cw=1278 out=2049 TEXT:Base is `ab6b914`. Briefing the worker. | subagent({"action":"start","agent":"worker","isolate":"worktree","background":true,"task":"Goal: add a pure domain function to Release Readiness Lab (TypeScript) answering \"what happens to the release if this task takes N more days?\" wit)
+5 ctx=47519 cw=16654 out=114 TEXT:I've started worker #149 in its own worktree, from base commit `ab6b9140941d3fb47c1ed9676887993854340d11`. I'm waiting for its report. When it arrives I'll chec
+6 ctx=47716 cw=21093 out=20 TEXT:Still waiting on worker #149; its report will wake me.
+7 ctx=48379 cw=665 out=154 bash({"command":"cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git log --oneline ab6b914..HEAD && git diff --stat ab6b914..HEAD && cat src/domain/whatif.ts"})
+8 ctx=49801 cw=18936 out=1191 TEXT:The diff looks clean. Starting the reviewer. | subagent({"action":"start","agent":"reviewer","background":true,"task":"Read-only review of commit range ab6b9140941d3fb47c1ed9676887993854340d11..5cee49fcfcd144fad0e01ab3b7e89545203e4a14 in /private/tmp/exp12/runs/t2-L/worktrees/149 (Rele)
+9 ctx=65607 cw=15806 out=86 TEXT:I've read worker #149's diff: two new files, and `delayImpact` delegates to `schedule`, `assessReadiness` and `slipDays`. I've started reviewer #270 on `ab6b914
+10 ctx=66013 cw=16212 out=238 codemode({"code":"const e = await ultimate.entries(149, {limit: 60});\nconst out = [];\nfor (const x of e) { const s = JSON.stringify(x); if (/test:e2e|vitest run|npm test|typecheck/.test(s) && /exit|passed|Tests/.test(s)) out.push(s.slice)
+11 ctx=67696 cw=17895 out=143 codemode({"code":"const r = await ultimate.search('e2e=', {conversationId: 149, limit: 5});\nreturn r.map(x => { const s = JSON.stringify(x); const i = s.indexOf('e2e='); return s.slice(Math.max(0,i-300), i+200); });"})
+12 ctx=68360 cw=2380 out=268 bash({"command":"cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git status --short && git format-patch -1 5cee49f -o /tmp/exp12-92-patch"})
+13 ctx=68525 cw=830 out=668 TEXT:`delayImpact` is built and the reviewer approved it in the first review round, with no findings. Nothing was submitted, landed, merged or pushed.
+
+- **Base SHA:
+14 ctx=69938 cw=1411 out=118 TEXT:That message only repeats my report, so there's nothing for me to do. The work is finished: approved commit `5cee49f`, with its patch at `/tmp/exp12-92-patch/00
+
