@@ -1,0 +1,3 @@
+build.jsonl {"turns":36,"toolCalls":36,"input":74,"output":62153,"cacheRead":3938280,"cacheWrite":157183,"total":4157690,"usd":1.4085,"models":["github-copilot/claude-sonnet-5.5"],"errors":0}
+review.jsonl {"turns":16,"toolCalls":19,"input":68871,"output":1200,"cacheRead":379136,"cacheWrite":0,"total":449207,"usd":0.1877,"models":["openai-codex/gpt-6.1-sol"],"errors":0}
+fix.jsonl {"turns":10,"toolCalls":10,"input":22,"output":5167,"cacheRead":309444,"cacheWrite":20770,"total":335403,"usd":0.1346,"models":["github-copilot/claude-sonnet-5.5"],"errors":0}

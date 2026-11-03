@@ -1,0 +1,7 @@
+  ✘  1 [chromium] › e2e/import-preview.spec.ts:10:1 › the import preview shows the FW-03 delay before it is confirmed, then the dashboard shows the delayed finish (6.0s)
+  ✘  2 [chromium] › e2e/import-preview.spec.ts:54:1 › the import preview keeps the forecast figures when the imported release has every task done (5.6s)
+    Error: expect(locator).toContainText(expected) failed
+    Expected substring: "This file matches the stored release."
+    Error: expect(locator).toContainText(expected) failed
+    Expected pattern: /Estimated finish\s*Wed 10 Feb 2027 → Fri 1 Jan 2027 \(complete\)\s*-28 working days earlier/
+  2 failed

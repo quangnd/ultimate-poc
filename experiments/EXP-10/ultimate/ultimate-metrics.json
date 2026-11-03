@@ -1,0 +1,329 @@
+{
+ "17099": {
+  "schema": "rrl-conversation-metrics/1",
+  "generatedAt": "2026-11-03T00:20:03.514Z",
+  "costLabel": "list-price proxy (subscriptions)",
+  "conversation": {
+   "id": 17099,
+   "title": "EXP-10 task: import preview diff (US-07, US-04, US-05)",
+   "label": "worker",
+   "busy": false,
+   "startedAt": "2026-11-03T00:07:42.803Z",
+   "endedAt": "2026-11-03T00:18:15.318Z",
+   "elapsedMinutes": 10.54,
+   "entries": {
+    "own": 125,
+    "forkedHistorySkipped": 0
+   },
+   "models": {
+    "github-copilot/claude-sonnet-5.5": {
+     "calls": {
+      "entries": 55,
+      "traceAgent": 55,
+      "traceExtension": 0,
+      "traceFailed": 0
+     },
+     "tokens": {
+      "input": 122,
+      "output": 61942,
+      "cacheRead": 6648182,
+      "cacheWrite": 181035,
+      "total": 6891281
+     },
+     "costUsd": 1.73707,
+     "fromEntries": {
+      "input": 114,
+      "output": 61789,
+      "cacheRead": 6648182,
+      "cacheWrite": 174246,
+      "total": 6884331,
+      "costUsd": 1.718551
+     },
+     "fromTrace": {
+      "input": 114,
+      "output": 61789,
+      "cacheRead": 6648182,
+      "cacheWrite": 174246,
+      "total": 6884331
+     },
+     "entriesMatchUsage": false,
+     "traceMatchesUsage": false
+    }
+   },
+   "toolBuckets": {},
+   "totals": {
+    "modelCalls": {
+     "entries": 55,
+     "traceAgent": 55,
+     "traceExtension": 0
+    },
+    "tokens": {
+     "input": 122,
+     "output": 61942,
+     "cacheRead": 6648182,
+     "cacheWrite": 181035,
+     "total": 6891281
+    },
+    "costUsd": 1.73707
+   },
+   "toolCalls": {
+    "total": 64,
+    "byName": {
+     "bash": 46,
+     "browser": 11,
+     "write": 4,
+     "edit": 3
+    },
+    "nestedFromTrace": {
+     "total": 0,
+     "byName": {}
+    },
+    "checks": {
+     "toolResultEntries": 64,
+     "traceDirect": 64
+    }
+   },
+   "trace": {
+    "rows": 119,
+    "oldest": "2026-11-03T00:07:44.479Z",
+    "truncated": false
+   },
+   "warnings": [
+    "github-copilot/claude-sonnet-5.5: trace tokens (6884331) differ from pi.usage (6891281); pi.usage is the figure Ultimate accounts"
+   ]
+  }
+ },
+ "17391": {
+  "schema": "rrl-conversation-metrics/1",
+  "generatedAt": "2026-11-03T00:20:03.546Z",
+  "costLabel": "list-price proxy (subscriptions)",
+  "conversation": {
+   "id": 17391,
+   "title": "You are a code reviewer. Another agent implemented the task…",
+   "label": "reviewer",
+   "busy": false,
+   "startedAt": "2026-11-03T00:16:31.107Z",
+   "endedAt": "2026-11-03T00:17:03.308Z",
+   "elapsedMinutes": 0.54,
+   "entries": {
+    "own": 15,
+    "forkedHistorySkipped": 0
+   },
+   "models": {
+    "openai-codex/gpt-6.1-sol": {
+     "calls": {
+      "entries": 6,
+      "traceAgent": 6,
+      "traceExtension": 0,
+      "traceFailed": 0
+     },
+     "tokens": {
+      "input": 41725,
+      "output": 775,
+      "cacheRead": 118400,
+      "cacheWrite": 0,
+      "total": 160900
+     },
+     "costUsd": 0.10304,
+     "fromEntries": {
+      "input": 41725,
+      "output": 775,
+      "cacheRead": 118400,
+      "cacheWrite": 0,
+      "total": 160900,
+      "costUsd": 0.10304
+     },
+     "fromTrace": {
+      "input": 41725,
+      "output": 775,
+      "cacheRead": 118400,
+      "cacheWrite": 0,
+      "total": 160900
+     },
+     "entriesMatchUsage": true,
+     "traceMatchesUsage": true
+    },
+    "github-copilot/claude-sonnet-5.5": {
+     "calls": {
+      "entries": 0,
+      "traceAgent": 0,
+      "traceExtension": 0,
+      "traceFailed": 0
+     },
+     "tokens": {
+      "input": 4,
+      "output": 69,
+      "cacheRead": 0,
+      "cacheWrite": 2493,
+      "total": 2566
+     },
+     "costUsd": 0.006931,
+     "entriesMatchUsage": false,
+     "traceMatchesUsage": false
+    }
+   },
+   "toolBuckets": {},
+   "totals": {
+    "modelCalls": {
+     "entries": 6,
+     "traceAgent": 6,
+     "traceExtension": 0
+    },
+    "tokens": {
+     "input": 41729,
+     "output": 844,
+     "cacheRead": 118400,
+     "cacheWrite": 2493,
+     "total": 163466
+    },
+    "costUsd": 0.109971
+   },
+   "toolCalls": {
+    "total": 5,
+    "byName": {
+     "bash": 5
+    },
+    "nestedFromTrace": {
+     "total": 0,
+     "byName": {}
+    },
+    "checks": {
+     "toolResultEntries": 5,
+     "traceDirect": 5
+    }
+   },
+   "trace": {
+    "rows": 11,
+    "oldest": "2026-11-03T00:16:31.392Z",
+    "truncated": false
+   },
+   "warnings": [
+    "github-copilot/claude-sonnet-5.5: trace tokens (0) differ from pi.usage (2566); pi.usage is the figure Ultimate accounts"
+   ]
+  }
+ },
+ "cutoff": "2026-11-03T00:20:03.591Z",
+ "coordinator": {
+  "schema": "rrl-conversation-metrics/1",
+  "generatedAt": "2026-11-03T00:20:03.554Z",
+  "costLabel": "list-price proxy (subscriptions)",
+  "conversation": {
+   "id": 16926,
+   "title": "EXP-10: Ultimate arm review finds one blocking issue",
+   "label": "coordinator",
+   "busy": true,
+   "startedAt": "2026-11-02T23:50:34.665Z",
+   "endedAt": "2026-11-03T00:19:55.273Z",
+   "elapsedMinutes": 29.34,
+   "entries": {
+    "own": 124,
+    "forkedHistorySkipped": 147
+   },
+   "models": {
+    "github-copilot/claude-sonnet-5.5": {
+     "calls": {
+      "entries": 0,
+      "traceAgent": 0,
+      "traceExtension": 10,
+      "traceFailed": 0
+     },
+     "tokens": {
+      "input": 40,
+      "output": 2977,
+      "cacheRead": 0,
+      "cacheWrite": 37618,
+      "total": 40635
+     },
+     "costUsd": 0.123895,
+     "fromTrace": {
+      "input": 40,
+      "output": 1928,
+      "cacheRead": 0,
+      "cacheWrite": 34544,
+      "total": 36512
+     },
+     "entriesMatchUsage": false,
+     "traceMatchesUsage": false
+    },
+    "claude-code/claude-opus-5-5": {
+     "calls": {
+      "entries": 49,
+      "traceAgent": 49,
+      "traceExtension": 0,
+      "traceFailed": 0
+     },
+     "tokens": {
+      "input": 100,
+      "output": 43380,
+      "cacheRead": 4699981,
+      "cacheWrite": 359131,
+      "total": 5102592
+     },
+     "costUsd": 4.681044,
+     "fromEntries": {
+      "input": 100,
+      "output": 43380,
+      "cacheRead": 4699981,
+      "cacheWrite": 359131,
+      "total": 5102592,
+      "costUsd": 4.681044
+     },
+     "fromTrace": {
+      "input": 100,
+      "output": 43380,
+      "cacheRead": 4699981,
+      "cacheWrite": 359131,
+      "total": 5102592
+     },
+     "entriesMatchUsage": true,
+     "traceMatchesUsage": true
+    }
+   },
+   "toolBuckets": {},
+   "totals": {
+    "modelCalls": {
+     "entries": 49,
+     "traceAgent": 49,
+     "traceExtension": 10
+    },
+    "tokens": {
+     "input": 140,
+     "output": 46357,
+     "cacheRead": 4699981,
+     "cacheWrite": 396749,
+     "total": 5143227
+    },
+    "costUsd": 4.804939
+   },
+   "toolCalls": {
+    "total": 47,
+    "byName": {
+     "bash": 35,
+     "write": 7,
+     "codemode": 4,
+     "subagent": 1
+    },
+    "nestedFromTrace": {
+     "total": 10,
+     "byName": {
+      "memory": 5,
+      "read": 3,
+      "subagent": 2
+     }
+    },
+    "checks": {
+     "toolResultEntries": 46,
+     "traceDirect": 46
+    }
+   },
+   "trace": {
+    "rows": 710,
+    "oldest": "2026-11-02T23:50:37.344Z",
+    "truncated": false
+   },
+   "warnings": [
+    "conversation is busy: usage, entries and trace were read at slightly different instants, and endedAt is \"so far\""
+   ]
+  }
+ }
+}
