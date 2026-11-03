@@ -3,7 +3,7 @@
 Updated: 2026-11-03
 Current phase: **P4 accepted (selectively reuse); targeted follow-ups B, E, A, C in progress, not a new phase.**
 Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62).
-Last verified commit: `69a796e` (PR #61, EXP-10 records, CI green).
+Last verified commit: `e5f0b8d` (PR #63, EXP-11 records, CI green).
 Active issues: P3 #33 (EXP-06/EXP-01/Dream), still open. P4 issues #45–#49 closed. Follow-ups E #60 and A #62 closed.
 Result of follow-up A #62 (EXP-11, `experiments/EXP-11/RUN-20261103-01.md`):
 - **Design:** 24 gate memories written by a coverage rule (ADRs and clarifications, gates P0–P4, experiment findings), index 34 → 55; then two memory-only arms. A2's 10 unseen questions were written by an independent GPT evaluator and frozen (sha256) before the memories were drafted.
