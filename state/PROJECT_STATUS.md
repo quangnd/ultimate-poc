@@ -3,7 +3,7 @@
 Updated: 2026-11-03
 Current phase: **P4 accepted (selectively reuse); targeted follow-ups B, E, A, C in progress, not a new phase.**
 Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62). C is done (HazAT/ultimate#68; rrl-e2e note PR #65, PO-approved; experiments/P4/FOLLOWUP_C.md). EXP-12 (#68, lean coordinator A/B) is done.
-Last verified commit: `ee888c7` (PR #65, rrl-e2e orphan note, CI green).
+Last verified commit: `4973aba` (PR #69, EXP-12 record, CI green).
 Active issues: none open. P3 #33 closed 2026-11-03 (EXP-06 PARTIAL, EXP-01 via EXP-09/EXP-11, Dream measured in experiments/P3/DREAM_RUN.md). P4 issues #45–#49 closed. Follow-ups E #60, A #62 and EXP-12 #68 closed.
 Result of EXP-12 #68 (`experiments/EXP-12/RUN-20261103-01.md`):
 - **Design:** built-in (O) vs lean overlay (L) coordinator, 2 single-issue tasks, same models (Opus / Sonnet 5.5 / GPT-6.1, proven from preview storage), same seed, one worker + one reviewer, hidden suites written first.
