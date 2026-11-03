@@ -22,9 +22,12 @@ The E2E run starts a web server and an API on two fixed ports, and two runs on o
 - **After a host restart**, an E2E run that was in flight can leave its Vite server alive on the lander's fixed port,
   and the resumed lander check fails with "already used" (experiments/P4/FAULT_INJECTION.md; HazAT/ultimate#68).
   The lander cannot take another pair, so here, unlike above, find the holder: `lsof -nP -iTCP:<port> -sTCP:LISTEN`,
-  then walk up with `ps -o ppid=,command= -p <pid>`. The holder is usually `vite`, under an `npm run dev` parent: kill
-  both only when that parent's own parent is 1 (the orphaned tree; recorded case: `kill 72489 72455`). If the chain
-  reaches a live Playwright or lander process instead, it is a running check, so leave it. Then resubmit.
+  then walk up with `ps -o ppid=,command= -p <pid>` and read each one's directory with `lsof -a -d cwd -p <pid>`.
+  Stop a process only when all of these match: the command is this project's `vite --port <port>` or its
+  `npm run dev --port <port>` parent; it listens on the lander's port; its directory is this project's lander checkout
+  or a worktree of it; and the `npm run dev` parent's own parent is 1 (orphaned is supporting evidence, not proof).
+  If any of these is unclear, or the chain reaches a live Playwright or lander process, stop nothing: report what you
+  found and ask the user to confirm. The recorded case is in FAULT_INJECTION.md (attempt 2). Then resubmit.
 - **A fresh checkout needs `npm ci`** first (a worktree has no `node_modules`). The Chromium browser is installed once per
   machine (`npx playwright install chromium`, see README.md), not per worktree.
 - The variables are read by Playwright's runner and its workers, so set them for the whole command, not only for part of it.
