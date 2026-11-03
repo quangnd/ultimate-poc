@@ -7,7 +7,7 @@ Last verified commit: `69a796e` (PR #61, EXP-10 records, CI green).
 Active issues: P3 #33 (EXP-06/EXP-01/Dream), still open. P4 issues #45–#49 closed. Follow-ups E #60 and A #62 closed.
 Result of follow-up A #62 (EXP-11, `experiments/EXP-11/RUN-20261103-01.md`):
 - **Design:** 24 gate memories written by a coverage rule (ADRs and clarifications, gates P0–P4, experiment findings), index 34 → 55; then two memory-only arms. A2's 10 unseen questions were written by an independent GPT evaluator and frozen (sha256) before the memories were drafted.
-- **Result:** A1 (EXP-09's 10) **10/10**, against 5/10. A2 (unseen) **8/10 correct + 2 partial**, 0 wrong. Misses: 1 content gap, 1 retrieval miss. Reads fell from 26 to 12 and 9 calls. Blind second scorer agreed 40/40. n = 1 per arm; questions and memories came from the same docs.
+- **Result:** A1 (EXP-09's 10) **10/10**, against 5/10. A2 (unseen) **8/10 correct + 2 partial**, 0 wrong (FAIL against the 9/10 bar). Misses: 1 content gap, 1 retrieval miss. Reads fell from 26 to 12 and 9 calls. Blind second scorer agreed 40/40. n = 1 per arm; questions and memories came from the same docs.
 Result of follow-up E #60 (EXP-10, `experiments/EXP-10/RUN-20261103-01.md`):
 - **Design:** model-matched A/B on one feature task (import preview diff, domain + UI + E2E). Same builder (Sonnet 5.5 xhigh) and reviewer (GPT-6.1 medium) in both arms, one review round each.
 - **Result:** both arms 22/22 hidden on the first pass, the same single UI defect caught by each reviewer and fixed in one round, all checks 0.
