@@ -1,0 +1,179 @@
+{
+ "home": "runs/t1-O",
+ "userInputsToUltimate": 1,
+ "conversations": {
+  "41": {
+   "role": "ultimate",
+   "model": "claude-code/claude-opus-5-5",
+   "calls": 5,
+   "input": 16,
+   "cacheRead": 119149,
+   "cacheWrite": 19338,
+   "output": 2315,
+   "cost": 0.2249,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.0238,
+    "cacheWrite": 0.1547,
+    "output": 0.0463
+   },
+   "first": "2026-11-03T10:07:46.567Z",
+   "last": "2026-11-03T10:12:25.144Z",
+   "tools": {
+    "branch": 1
+   },
+   "reads": {},
+   "bash": [],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 1,
+    "stop": 4
+   },
+   "total": 140818,
+   "contextMedian": 27458,
+   "contextMax": 29298,
+   "elapsedS": 279,
+   "rereads": {}
+  },
+  "92": {
+   "role": "branch",
+   "model": "claude-code/claude-opus-5-5",
+   "calls": 13,
+   "input": 30,
+   "cacheRead": 502937,
+   "cacheWrite": 117791,
+   "output": 5213,
+   "cost": 1.1473,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.1006,
+    "cacheWrite": 0.9423,
+    "output": 0.1043
+   },
+   "first": "2026-11-03T10:07:59.971Z",
+   "last": "2026-11-03T10:12:22.163Z",
+   "tools": {
+    "bash": 5,
+    "read": 3,
+    "subagent": 2
+   },
+   "reads": {
+    "/private/tmp/exp12/runs/t1-O/worktrees/92/src/domain/schedule.ts": 1,
+    "/private/tmp/exp12/runs/t1-O/worktrees/92/src/domain/readiness.ts": 1,
+    "/private/tmp/exp12/runs/t1-O/worktrees/92/.ultimate/skills/rrl-e2e/SKILL.md": 1
+   },
+   "bash": [
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/92 && git log -1 --format=%H && git status --short && ls src/domain tests/domain && grep -n \"export\" src/domain/schedu",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/92 && cat fixtures/README.md | head -60; grep -n \"slip\\|clarification 1\" -i docs/decisions/ADR-002-scheduling-semantic",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git log --oneline 7f4ca08..HEAD && git diff --stat 7f4ca08..HEAD && cat src/domain/late.ts",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git status --short && git rev-parse HEAD && npm run typecheck >/tmp/tc153.log 2>&1; echo typecheck=$?; npm test",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && ( eval \"$(node -e 'const n=require(\"node:net\"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,\"127.0.0"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 8,
+    "stop": 5
+   },
+   "total": 625971,
+   "contextMedian": 47565,
+   "contextMax": 66113,
+   "elapsedS": 262,
+   "rereads": {}
+  },
+  "153": {
+   "role": "worker",
+   "model": "github-copilot/claude-sonnet-5.5",
+   "calls": 13,
+   "input": 28,
+   "cacheRead": 566170,
+   "cacheWrite": 50344,
+   "output": 18310,
+   "cost": 0.3656,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.0566,
+    "cacheWrite": 0.1259,
+    "output": 0.1831
+   },
+   "first": "2026-11-03T10:08:26.361Z",
+   "last": "2026-11-03T10:10:53.115Z",
+   "tools": {
+    "bash": 11,
+    "write": 2
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git log --oneline -3 && git status --short | head && ls && cat src/domain/schedule.ts src/domain/readiness.ts s",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && cat AGENTS.md | head -5; cat fixtures/README.md; cat docs/decisions/ADR-002-scheduling-semantics.md; grep -n \"U",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && cat tests/domain/readiness.test.ts | head -80; ls tests/domain tests src/domain; cat package.json; cat .ultimat",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && sed -n 60,120p src/domain/calendar.ts; sed -n 1,40p tests/fixture.test.ts; cat > /tmp/probe153.ts <<'EOF'\nimpor",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && sed -n 1,60p tests/domain/schedule.test.ts; grep -n \"shuffle\\|structuredClone\\|freeze\" -r tests | head; grep -n",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && python3 - <<'EOF'\np='tests/domain/late.test.ts'\ns=open(p).read()\nold=s[s.index(\"const rotate = \"):s.index(\"/**\\",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && npx vitest run tests/domain/late.test.ts 2>&1 | tail -40; npm run typecheck 2>&1 | tail -15",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && cp src/domain/late.ts /tmp/late.orig.ts && run() { npx vitest run tests/domain/late.test.ts 2>&1 | grep -E \"Tes",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && npm run typecheck >/tmp/tc153.log 2>&1; echo \"typecheck exit $?\"; tail -3 /tmp/tc153.log; npm test >/tmp/test15",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && ( eval \"$(node -e 'const n=require(\"node:net\"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,\"127.0.0",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git status --short && git add src/domain/late.ts tests/domain/late.test.ts && git commit -q -F - <<'EOF'\nfeat(d"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 12,
+    "stop": 1
+   },
+   "total": 634852,
+   "contextMedian": 54133,
+   "contextMax": 59936,
+   "elapsedS": 147,
+   "rereads": {}
+  },
+  "275": {
+   "role": "reviewer",
+   "model": "openai-codex/gpt-6.1-sol",
+   "calls": 4,
+   "input": 25017,
+   "cacheRead": 34816,
+   "cacheWrite": 0,
+   "output": 623,
+   "cost": 0.0597,
+   "costParts": {
+    "input": 0.05,
+    "cacheRead": 0.0035,
+    "cacheWrite": 0,
+    "output": 0.0062
+   },
+   "first": "2026-11-03T10:11:17.651Z",
+   "last": "2026-11-03T10:11:28.019Z",
+   "tools": {
+    "bash": 3
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && cat README.md docs/PRD.md docs/ARCHITECTURE.md docs/ROADMAP.md state/PROJECT_STATUS.md",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && git log --oneline 7f4ca08e3354993fe79ab1d712aec6f33e4c4a2f..baa1ceab5f06985f15658508333865760214a68f && git dif",
+    "cd /private/tmp/exp12/runs/t1-O/worktrees/153 && cat docs/decisions/ADR-002-scheduling-semantics.md fixtures/README.md src/domain/calendar.ts && cat fixtures/re"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 3,
+    "stop": 1
+   },
+   "total": 60456,
+   "contextMedian": 10373,
+   "contextMax": 24923,
+   "elapsedS": 10,
+   "rereads": {}
+  }
+ }
+}

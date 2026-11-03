@@ -1,0 +1,187 @@
+diff --git a/src/domain/late.ts b/src/domain/late.ts
+new file mode 100644
+index 0000000..37d765b
+--- /dev/null
++++ b/src/domain/late.ts
+@@ -0,0 +1,48 @@
++/**
++ * Open tasks the forecast puts past their own target date (ADR-002 §6, US-06). Pure: no I/O, no clock, no randomness.
++ * Nothing is recomputed here: finish and slip come from `schedule`, the driving chain from `assessReadiness`.
++ * Precondition, not re-checked: the document passed validateDocument.
++ */
++import { assessReadiness } from './readiness'
++import { schedule } from './schedule'
++import type { IsoDate, ReleaseDocument } from './types'
++
++export interface LateTask {
++  id: string
++  stream: string
++  targetDate: IsoDate
++  /** the task's forecast finish date, `schedule(doc)` */
++  finishDate: IsoDate
++  /** the task's `slipDays` from `schedule(doc)`; always > 0 here */
++  slipDays: number
++  /** true when the task is on `assessReadiness(doc, schedule(doc)).drivingChain` */
++  onDrivingChain: boolean
++}
++
++/** Code-unit order (not localeCompare), so the result does not depend on the runtime's locale. */
++function compareIds(a: string, b: string): number {
++  return a < b ? -1 : a > b ? 1 : 0
++}
++
++/** Tasks that are not done, have a target date and a forecast slip above 0; worst slip first, ties by id ascending. */
++export function lateTasks(doc: ReleaseDocument): LateTask[] {
++  const forecast = schedule(doc)
++  const slots = new Map(forecast.tasks.map((t) => [t.id, t]))
++  const drivingChain = new Set(assessReadiness(doc, forecast).drivingChain)
++
++  const late: LateTask[] = []
++  for (const task of doc.tasks) {
++    if (task.status === 'done' || task.targetDate === undefined) continue
++    const slot = slots.get(task.id)
++    if (slot?.slipDays === undefined || slot.slipDays <= 0) continue
++    late.push({
++      id: task.id,
++      stream: task.stream,
++      targetDate: task.targetDate,
++      finishDate: slot.finishDate,
++      slipDays: slot.slipDays,
++      onDrivingChain: drivingChain.has(task.id),
++    })
++  }
++  return late.sort((a, b) => b.slipDays - a.slipDays || compareIds(a.id, b.id))
++}
+diff --git a/tests/domain/late.test.ts b/tests/domain/late.test.ts
+new file mode 100644
+index 0000000..ad51b63
+--- /dev/null
++++ b/tests/domain/late.test.ts
+@@ -0,0 +1,127 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { lateTasks, type LateTask } from '../../src/domain/late'
++import { assessReadiness } from '../../src/domain/readiness'
++import { schedule } from '../../src/domain/schedule'
++import type { ReleaseDocument, Status, Task } from '../../src/domain/types'
++
++// Synthetic doc, day 0 = Mon 2026-01-05 (day 4 Fri 01-09, day 5 Mon 01-12). Forecast, by hand:
++//   c  QA  5d            [0,4] finish 01-09, target 01-05 -> slip 4
++//   e  QA  1d after c    [5,5] finish 01-12, target 01-12 -> slip 0 (on time, not listed)
++//   B  FW  2d            [0,1] finish 01-06, target 01-05 -> slip 1  \ tie: code-unit order puts 'B' before 'a',
++//   a  App 2d            [0,1] finish 01-06, target 01-05 -> slip 1  / localeCompare would put 'a' first
++//   n  App 3d after a    [2,4] no target date (not listed)
++//   ok FW  1d after B    [2,2] finish 01-07, target 01-30 -> slip < 0 (early, not listed)
++//   d  done, FW          finish day -1 = Fri 2026-01-02, target 2025-12-30 -> slip 3, but done (not listed)
++// Driving chain: e <- c (c finishes on day 4 = 5 - 1). B and a are late and off the chain.
++
++function task(
++  id: string,
++  stream: string,
++  estimateDays: number,
++  predecessors: string[] = [],
++  extra: { status?: Status; targetDate?: string } = {},
++): Task {
++  return { id, title: id, stream, ownerRole: 'owner', status: 'todo', estimateDays, predecessors, ...extra }
++}
++
++function doc(tasks: Task[]): ReleaseDocument {
++  return { schemaVersion: 1, release: { startDate: '2026-01-05' }, workstreams: ['FW', 'SPS', 'Security', 'App', 'QA'], tasks }
++}
++
++const synthetic = doc([
++  task('c', 'QA', 5, [], { targetDate: '2026-01-05' }),
++  task('e', 'QA', 1, ['c'], { targetDate: '2026-01-12' }),
++  task('B', 'FW', 2, [], { targetDate: '2026-01-05' }),
++  task('a', 'App', 2, [], { targetDate: '2026-01-05' }),
++  task('n', 'App', 3, ['a']),
++  task('ok', 'FW', 1, ['B'], { targetDate: '2026-01-30' }),
++  task('d', 'FW', 1, [], { status: 'done', targetDate: '2025-12-30' }),
++])
++const syntheticLate: LateTask[] = [
++  { id: 'c', stream: 'QA', targetDate: '2026-01-05', finishDate: '2026-01-09', slipDays: 4, onDrivingChain: true },
++  { id: 'B', stream: 'FW', targetDate: '2026-01-05', finishDate: '2026-01-06', slipDays: 1, onDrivingChain: false },
++  { id: 'a', stream: 'App', targetDate: '2026-01-05', finishDate: '2026-01-06', slipDays: 1, onDrivingChain: false },
++]
++
++const fixture = JSON.parse(readFileSync(new URL('../../fixtures/release.json', import.meta.url), 'utf8')) as ReleaseDocument
++// fixtures/README.md firmware-delay scenario: FW-03 estimate 5 -> 8.
++const delayed = structuredClone(fixture)
++delayed.tasks.find((t) => t.id === 'FW-03')!.estimateDays = 8
++// Delayed forecast: release finishes Mon 2027-02-15. FW-06 2 days late (off the chain), FW-03, SEC-05 and QA-04 1 day late;
++// APP-05 finishes on its target (slip 0). The driving chain is QA-03 <- SEC-05 <- ... <- FW-03 <- FW-02 and excludes QA-04.
++const delayedLate: LateTask[] = [
++  { id: 'FW-06', stream: 'FW', targetDate: '2027-01-22', finishDate: '2027-01-26', slipDays: 2, onDrivingChain: false },
++  { id: 'FW-03', stream: 'FW', targetDate: '2027-01-15', finishDate: '2027-01-18', slipDays: 1, onDrivingChain: true },
++  { id: 'QA-04', stream: 'QA', targetDate: '2027-02-12', finishDate: '2027-02-15', slipDays: 1, onDrivingChain: false },
++  { id: 'SEC-05', stream: 'Security', targetDate: '2027-02-05', finishDate: '2027-02-08', slipDays: 1, onDrivingChain: true },
++]
++
++function deepFreeze<T>(value: T): T {
++  if (typeof value === 'object' && value !== null) Object.values(value).forEach(deepFreeze)
++  return Object.freeze(value)
++}
++
++/** Tasks, predecessors and workstreams in reverse order, and tasks rotated by `rotate`. */
++function reordered(d: ReleaseDocument, rotate: number): ReleaseDocument[] {
++  const tasks = d.tasks.map((t) => ({ ...t, predecessors: [...t.predecessors].reverse() }))
++  const rotated = [...tasks.slice(rotate), ...tasks.slice(0, rotate)]
++  return [
++    { ...d, workstreams: [...d.workstreams].reverse(), tasks: [...tasks].reverse() },
++    { ...d, tasks: rotated },
++  ]
++}
++
++describe('lateTasks', () => {
++  it('lists only open tasks with a target date and a forecast slip above 0', () => {
++    expect(schedule(synthetic).tasks.find((t) => t.id === 'd')?.slipDays).toBeGreaterThan(0) // the done task is late by the forecast
++    expect(lateTasks(synthetic).map((t) => t.id)).toEqual(['c', 'B', 'a']) // not d (done), n (no target), e (slip 0), ok (early)
++    expect(lateTasks(delayed).map((t) => t.id)).toEqual(['FW-06', 'FW-03', 'QA-04', 'SEC-05']) // not APP-05 (slip 0)
++  })
++
++  it('takes finishDate and slipDays from the scheduler, stream and targetDate from the task', () => {
++    for (const d of [synthetic, delayed]) {
++      const forecast = schedule(d)
++      for (const entry of lateTasks(d)) {
++        const own = d.tasks.find((t) => t.id === entry.id)!
++        const slot = forecast.tasks.find((t) => t.id === entry.id)!
++        expect(entry).toMatchObject({ stream: own.stream, targetDate: own.targetDate, finishDate: slot.finishDate, slipDays: slot.slipDays })
++      }
++    }
++    expect(lateTasks(synthetic)).toEqual(syntheticLate)
++    expect(lateTasks(delayed)).toEqual(delayedLate)
++  })
++
++  it('marks onDrivingChain by membership in the assessReadiness driving chain', () => {
++    expect(assessReadiness(synthetic, schedule(synthetic)).drivingChain).toEqual(['e', 'c'])
++    const chain = assessReadiness(delayed, schedule(delayed)).drivingChain
++    expect(chain).not.toContain('QA-04') // the 0-day gate ties QA-03; the walk starts at the smaller id
++    expect(lateTasks(delayed).map((t) => [t.id, t.onDrivingChain])).toEqual(
++      lateTasks(delayed).map((t) => [t.id, chain.includes(t.id)]),
++    )
++    expect(lateTasks(delayed).filter((t) => t.onDrivingChain).map((t) => t.id)).toEqual(['FW-03', 'SEC-05'])
++  })
++
++  it('orders by slipDays descending, ties by id in code-unit order', () => {
++    const late = lateTasks(synthetic)
++    expect(late.map((t) => t.slipDays)).toEqual([4, 1, 1])
++    expect(late.slice(1).map((t) => t.id)).toEqual(['B', 'a']) // 'B' < 'a' in code units; 'a'.localeCompare('B') < 0
++    expect(lateTasks(delayed).map((t) => [t.slipDays, t.id])).toEqual([[2, 'FW-06'], [1, 'FW-03'], [1, 'QA-04'], [1, 'SEC-05']])
++  })
++
++  it('is empty when nothing qualifies', () => {
++    expect(lateTasks(fixture)).toEqual([]) // baseline fixture: every target is met
++    expect(lateTasks(doc([]))).toEqual([])
++    expect(lateTasks({ ...synthetic, tasks: synthetic.tasks.map((t) => ({ ...t, status: 'done' as const })) })).toEqual([])
++    expect(lateTasks({ ...synthetic, tasks: synthetic.tasks.map(({ targetDate: _, ...t }) => t) })).toEqual([])
++  })
++
++  it('is pure: input is not mutated and task, predecessor and workstream order do not matter', () => {
++    for (const [d, expected] of [[synthetic, syntheticLate], [delayed, delayedLate]] as const) {
++      const before = structuredClone(d)
++      expect(lateTasks(deepFreeze(structuredClone(d)))).toEqual(expected) // a frozen input would throw on any write
++      expect(d).toEqual(before)
++      for (const variant of reordered(d, 3)) expect(lateTasks(variant)).toEqual(expected)
++    }
++  })
++})

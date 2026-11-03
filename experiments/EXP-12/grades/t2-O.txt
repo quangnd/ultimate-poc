@@ -1,0 +1,7 @@
+hidden_exit=0
+      Tests  12 passed (12)
+typecheck_exit=0
+test_exit=0
+      Tests  812 passed (812)
+e2e_exit=0
+  7 passed (10.6s)

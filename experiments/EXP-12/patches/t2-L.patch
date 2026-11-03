@@ -1,0 +1,288 @@
+diff --git a/src/domain/whatif.ts b/src/domain/whatif.ts
+new file mode 100644
+index 0000000..7c76e42
+--- /dev/null
++++ b/src/domain/whatif.ts
+@@ -0,0 +1,66 @@
++/**
++ * What-if: what happens to the release if one task takes N more days (PRD US-04, ADR-002 §2, §6, §7). Pure: no I/O,
++ * no clock, no randomness; the document is never mutated, the "after" schedule runs on a copy. Everything is delegated
++ * to `schedule`, `assessReadiness` and `slipDays`, so the result is as order-independent as they are.
++ * Precondition: the document passed validateDocument. The copy is not re-validated (estimate bounds, §2, are not enforced).
++ */
++import { slipDays } from './calendar'
++import { assessReadiness } from './readiness'
++import { schedule } from './schedule'
++import type { IsoDate, ReleaseDocument } from './types'
++
++export interface DelayImpact {
++  taskId: string
++  extraDays: number
++  /** `schedule(doc).finishDate` before and after the delay */
++  beforeFinishDate: IsoDate
++  afterFinishDate: IsoDate
++  /** working days from beforeFinishDate to afterFinishDate, counted as `slipDays(beforeFinishDate, afterFinishDate)` */
++  deltaWorkingDays: number
++  /** `schedule(doc).slipDays` before and after; null when the release has no targetDate */
++  beforeSlipDays: number | null
++  afterSlipDays: number | null
++  /** true when the task is on the driving chain of the document BEFORE the delay (`assessReadiness`) */
++  onDrivingChain: boolean
++}
++
++export type DelayErrorCode = 'unknown-task' | 'done-task' | 'invalid-days'
++
++export type DelayResult =
++  | { ok: true; impact: DelayImpact }
++  | { ok: false; error: { code: DelayErrorCode; message: string } }
++
++function fail(code: DelayErrorCode, message: string): DelayResult {
++  return { ok: false, error: { code, message } }
++}
++
++/** Errors are checked in this order: unknown task, done task, then the days (a done task has no remaining work to extend). */
++export function delayImpact(doc: ReleaseDocument, taskId: string, extraDays: number): DelayResult {
++  const task = doc.tasks.find((t) => t.id === taskId)
++  if (task === undefined) return fail('unknown-task', `unknown task ${taskId}`)
++  if (task.status === 'done') return fail('done-task', `task ${taskId} is done; it has no remaining work to extend`)
++  if (!Number.isInteger(extraDays) || extraDays <= 0) {
++    return fail('invalid-days', `extraDays for task ${taskId} must be a positive integer, got ${String(extraDays)}`)
++  }
++
++  const before = schedule(doc)
++  const delayed: ReleaseDocument = {
++    ...doc,
++    tasks: doc.tasks.map((t) => (t.id === taskId ? { ...t, estimateDays: t.estimateDays + extraDays } : t)),
++  }
++  const after = schedule(delayed)
++
++  return {
++    ok: true,
++    impact: {
++      taskId,
++      extraDays,
++      beforeFinishDate: before.finishDate,
++      afterFinishDate: after.finishDate,
++      deltaWorkingDays: slipDays(before.finishDate, after.finishDate),
++      beforeSlipDays: before.slipDays ?? null,
++      afterSlipDays: after.slipDays ?? null,
++      onDrivingChain: assessReadiness(doc, before).drivingChain.includes(taskId),
++    },
++  }
++}
+diff --git a/tests/domain/whatif.test.ts b/tests/domain/whatif.test.ts
+new file mode 100644
+index 0000000..aad491f
+--- /dev/null
++++ b/tests/domain/whatif.test.ts
+@@ -0,0 +1,210 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { delayImpact, type DelayImpact } from '../../src/domain/whatif'
++import type { ReleaseDocument, Status, Task } from '../../src/domain/types'
++import { validateDocument } from '../../src/domain/validate'
++
++// Hand computations use day0 = Mon 2026-01-05 (day 5 = Mon 01-12, 6 Tue, 7 Wed, 8 Thu 01-15, 10 Mon 01-19, 11 Tue 01-20).
++
++const START = '2026-01-05'
++
++function task(id: string, stream: string, estimateDays: number, predecessors: string[] = [], status: Status = 'todo'): Task {
++  return { id, title: id, stream, ownerRole: 'owner', status, estimateDays, predecessors }
++}
++
++function doc(tasks: Task[], targetDate?: string): ReleaseDocument {
++  return {
++    schemaVersion: 1,
++    release: { startDate: START, ...(targetDate === undefined ? {} : { targetDate }) },
++    workstreams: ['FW', 'SPS', 'Security', 'App', 'QA'],
++    tasks,
++  }
++}
++
++/** F FW 2d [0,1] -> P App 3d [2,4] -> Q QA 1d [5,5] (Mon 2026-01-12). O SPS 2d [0,1] is independent. Driving chain Q, P, F. */
++function sample(targetDate?: string): ReleaseDocument {
++  return doc([task('Q', 'QA', 1, ['P']), task('P', 'App', 3, ['F']), task('F', 'FW', 2), task('O', 'SPS', 2)], targetDate)
++}
++
++function impactOf(d: ReleaseDocument, id: string, days: number): DelayImpact {
++  const result = delayImpact(d, id, days)
++  if (!result.ok) throw new Error(`expected an impact, got ${result.error.code}: ${result.error.message}`)
++  return result.impact
++}
++
++function deepFreeze<T>(value: T): T {
++  if (typeof value === 'object' && value !== null) {
++    Object.values(value).forEach(deepFreeze)
++    Object.freeze(value)
++  }
++  return value
++}
++
++describe('delayImpact: before and after (acceptance 1, 2)', () => {
++  it('moves the finish by the delay when the task drives the release', () => {
++    // F 2d -> 5d: F [0,4], P [5,7], Q [8,8] = Thu 2026-01-15. Before: Q day 5 = Mon 2026-01-12.
++    expect(impactOf(sample(), 'F', 3)).toEqual({
++      taskId: 'F',
++      extraDays: 3,
++      beforeFinishDate: '2026-01-12',
++      afterFinishDate: '2026-01-15',
++      deltaWorkingDays: 3,
++      beforeSlipDays: null,
++      afterSlipDays: null,
++      onDrivingChain: true,
++    })
++  })
++
++  it('counts a delay that crosses a weekend in working days, not calendar days', () => {
++    // Single task A 4d [0,3] = Thu 01-08; +2 -> [0,5] = Mon 01-12; two working days, four calendar days.
++    const impact = impactOf(doc([task('A', 'FW', 4)]), 'A', 2)
++    expect(impact.beforeFinishDate).toBe('2026-01-08')
++    expect(impact.afterFinishDate).toBe('2026-01-12')
++    expect(impact.deltaWorkingDays).toBe(2)
++  })
++
++  it('leaves the finish alone when a task off the driving chain is delayed within its slack', () => {
++    // O [0,1] -> 2d + 2 = [0,3]; the release still finishes with Q on day 5.
++    expect(impactOf(sample(), 'O', 2)).toMatchObject({
++      beforeFinishDate: '2026-01-12',
++      afterFinishDate: '2026-01-12',
++      deltaWorkingDays: 0,
++      onDrivingChain: false,
++    })
++  })
++
++  it('judges the driving chain before the delay: an off-chain task that becomes the end still reports false', () => {
++    // O 2d + 10 = 12d [0,11] = Tue 2026-01-20; before it was Mon 2026-01-12: six working days later.
++    expect(impactOf(sample(), 'O', 10)).toMatchObject({
++      afterFinishDate: '2026-01-20',
++      deltaWorkingDays: 6,
++      onDrivingChain: false,
++    })
++  })
++
++  it('puts a task on the driving chain through a capacity binder, and the delay carries over the weekend', () => {
++    // A FW 2d [0,1], B FW 2d [2,3] (capacity binder A), C App 1d after B [4,4]. Chain C, B, A. A + 1: A [0,2], B [3,4], C [5,5].
++    const d = doc([task('A', 'FW', 2), task('B', 'FW', 2), task('C', 'App', 1, ['B'])])
++    expect(impactOf(d, 'A', 1)).toMatchObject({ beforeFinishDate: '2026-01-09', afterFinishDate: '2026-01-12', deltaWorkingDays: 1, onDrivingChain: true })
++  })
++
++  it('does not change the stored document: only the delayed copy gets the longer estimate', () => {
++    const d = sample()
++    impactOf(d, 'F', 3)
++    expect(d.tasks.find((t) => t.id === 'F')!.estimateDays).toBe(2)
++  })
++})
++
++describe('delayImpact: target date (acceptance 4)', () => {
++  it('reports the slip against the release target before and after', () => {
++    // Target Tue 2026-01-13: before Mon 01-12 = -1; after Thu 01-15 = +2.
++    expect(impactOf(sample('2026-01-13'), 'F', 3)).toMatchObject({ beforeSlipDays: -1, afterSlipDays: 2, deltaWorkingDays: 3 })
++  })
++
++  it('keeps the slip unchanged when the finish does not move', () => {
++    expect(impactOf(sample('2026-01-13'), 'O', 2)).toMatchObject({ beforeSlipDays: -1, afterSlipDays: -1, deltaWorkingDays: 0 })
++  })
++
++  it('reports null slips when the release has no target date', () => {
++    const impact = impactOf(sample(), 'F', 3)
++    expect(impact.beforeSlipDays).toBeNull()
++    expect(impact.afterSlipDays).toBeNull()
++  })
++})
++
++describe('delayImpact: firmware-delay scenario of the fixture (acceptance 3)', () => {
++  const result = validateDocument(JSON.parse(readFileSync('fixtures/release.json', 'utf8')))
++  if (!result.ok) throw new Error('fixture must be valid')
++  const fixture = result.document
++
++  it('FW-03 +3 moves the finish from Wed 2027-02-10 to Mon 2027-02-15, from 2 days early to 1 day late', () => {
++    expect(impactOf(fixture, 'FW-03', 3)).toEqual({
++      taskId: 'FW-03',
++      extraDays: 3,
++      beforeFinishDate: '2027-02-10',
++      afterFinishDate: '2027-02-15',
++      deltaWorkingDays: 3,
++      beforeSlipDays: -2,
++      afterSlipDays: 1,
++      onDrivingChain: true,
++    })
++  })
++
++  it('a branch with slack (APP-04 [6,9] -> [6,11], APP-05 still waits for APP-03 on day 16) does not move it', () => {
++    expect(impactOf(fixture, 'APP-04', 2)).toMatchObject({
++      beforeFinishDate: '2027-02-10',
++      afterFinishDate: '2027-02-10',
++      deltaWorkingDays: 0,
++      onDrivingChain: false,
++    })
++  })
++})
++
++describe('delayImpact: errors and their order (acceptance 5)', () => {
++  const d = sample()
++  const withDone = doc([task('D', 'FW', 1, [], 'done'), task('A', 'FW', 2, ['D'])])
++  const code = (result: ReturnType<typeof delayImpact>) => (result.ok ? 'ok' : result.error.code)
++
++  it('rejects a task id that is not in the document', () => {
++    const result = delayImpact(d, 'nope', 2)
++    expect(result).toEqual({ ok: false, error: { code: 'unknown-task', message: expect.stringContaining('nope') } })
++  })
++
++  it('rejects a done task', () => {
++    const result = delayImpact(withDone, 'D', 2)
++    expect(result).toEqual({ ok: false, error: { code: 'done-task', message: expect.stringContaining('D') } })
++  })
++
++  it.each([0, -1, 1.5, NaN, Infinity, -Infinity])('rejects extraDays %s', (days) => {
++    const result = delayImpact(d, 'F', days)
++    expect(result).toEqual({ ok: false, error: { code: 'invalid-days', message: expect.stringContaining(String(days)) } })
++    if (!result.ok) expect(result.error.message).toContain('F')
++  })
++
++  it('checks the task id first: an unknown id with bad days is unknown-task', () => {
++    expect(code(delayImpact(d, 'nope', 0))).toBe('unknown-task')
++    expect(code(delayImpact(d, 'nope', NaN))).toBe('unknown-task')
++  })
++
++  it('checks done before the days: a done task with bad days is done-task', () => {
++    expect(code(delayImpact(withDone, 'D', 0))).toBe('done-task')
++    expect(code(delayImpact(withDone, 'D', 1.5))).toBe('done-task')
++  })
++
++  it('accepts the smallest valid delay', () => {
++    expect(code(delayImpact(d, 'F', 1))).toBe('ok')
++  })
++})
++
++describe('delayImpact: purity (acceptance 6)', () => {
++  const fixture = (() => {
++    const result = validateDocument(JSON.parse(readFileSync('fixtures/release.json', 'utf8')))
++    if (!result.ok) throw new Error('fixture must be valid')
++    return result.document
++  })()
++
++  it('never mutates the document, on success or failure', () => {
++    const frozen = deepFreeze(structuredClone(fixture))
++    const copy = structuredClone(fixture)
++    expect(delayImpact(frozen, 'FW-03', 3).ok).toBe(true)
++    expect(delayImpact(frozen, 'nope', 3).ok).toBe(false)
++    expect(delayImpact(frozen, 'FW-01', 3).ok).toBe(false)
++    expect(delayImpact(frozen, 'FW-03', 0).ok).toBe(false)
++    expect(frozen).toEqual(copy)
++  })
++
++  it('is deterministic: the same call gives deep-equal results', () => {
++    expect(delayImpact(fixture, 'FW-03', 3)).toEqual(delayImpact(fixture, 'FW-03', 3))
++  })
++
++  it('does not depend on the order of tasks, predecessors or workstreams', () => {
++    const shuffled: ReleaseDocument = {
++      ...fixture,
++      workstreams: [...fixture.workstreams].reverse(),
++      tasks: [...fixture.tasks].reverse().map((t) => ({ ...t, predecessors: [...t.predecessors].reverse() })),
++    }
++    for (const [id, days] of [['FW-03', 3], ['APP-04', 2], ['SPS-04', 4], ['QA-03', 1], ['FW-01', 1], ['nope', 1], ['FW-03', 0]] as const) {
++      expect(delayImpact(shuffled, id, days)).toEqual(delayImpact(fixture, id, days))
++    }
++  })
++})
