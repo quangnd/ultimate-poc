@@ -1,0 +1,11 @@
+EXP-11 A2 unseen questions (evaluator #17945, openai-codex/gpt-6.1-sol, from repo at 24525e7)
+Q1. Under the scheduling decision accepted at P0, how are eligible tasks ordered when their earliest start days tie?
+Q2. Under P1's readiness clarification, how must an inconsistency (a done task with an open predecessor) be handled when it is the only apparent readiness problem?
+Q3. What two API protections were added in P2 to prevent cross-site simple requests and DNS rebinding from writing the release store?
+Q4. In EXP-02's safe host-restart trial, what leftover external side effect required the resumed worker to clean it up?
+Q5. In EXP-05, what workaround supplied GitHub issue counts to the POC status panel when no documented extension API could read them?
+Q6. What adoption verdict did the reconciled P4 scorecard reach?
+Q7. In EXP-07's same-builder-model comparison on task 1, approximately how many times the single worker's cost proxy did orchestration cost?
+Q8. What identical import-preview UI defect did both reviewers find in EXP-10's first builds?
+Q9. Why did the Product Owner choose the Node command-line flag rather than NODE_OPTIONS for network follow-up B?
+Q10. What observation was predeclared sufficient to mark network follow-up B effective at its pending 24-hour re-count?
