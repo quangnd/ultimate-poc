@@ -1,0 +1,15 @@
+2026-11-03T09:57:23Z start label=t1-O pid=76371 port=47821 home=/tmp/exp12/runs/t1-O worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19421 head=7f4ca08
+2026-11-03T09:57:24Z start label=t1-L pid=76381 port=47822 home=/tmp/exp12/runs/t1-L worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19408 head=ab6b914
+2026-11-03T10:03:04Z stop t1-O,t1-L attempt 1 (seed defect: root used subagent not branch)
+2026-11-03T10:03:20Z start label=t1-O pid=79185 port=47821 home=/tmp/exp12/runs/t1-O worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19421 head=7f4ca08
+2026-11-03T10:03:20Z start label=t1-L pid=79204 port=47822 home=/tmp/exp12/runs/t1-L worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19408 head=ab6b914
+2026-11-03T10:04:36Z seed t1 sent to t1-O,t1-L (attempt 2)
+2026-11-03T10:06:29Z stop t1 attempt 2 (seed reached conversation 1 before @ultimate existed)
+2026-11-03T10:06:29Z start label=t1-O pid=80726 port=47821 home=/tmp/exp12/runs/t1-O worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19421 head=7f4ca08
+2026-11-03T10:06:29Z start label=t1-L pid=80736 port=47822 home=/tmp/exp12/runs/t1-L worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19408 head=ab6b914
+2026-11-03T10:07:52Z seed t1 sent to @ultimate #41 in t1-O,t1-L (attempt 3)
+2026-11-03T10:14:39Z stop t1-O,t1-L (done)
+2026-11-03T10:14:39Z start label=t2-O pid=86448 port=47831 home=/tmp/exp12/runs/t2-O worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19421 head=7f4ca08
+2026-11-03T10:14:40Z start label=t2-L pid=86458 port=47832 home=/tmp/exp12/runs/t2-L worktree=/Users/mun/.ultimate/projects/ultimate-poc-a1e52e44/worktrees/19408 head=ab6b914
+2026-11-03T10:15:15Z seed t2 sent to @ultimate #41 in t2-O,t2-L
+2026-11-03T10:21:03Z stop t2-O,t2-L (done)

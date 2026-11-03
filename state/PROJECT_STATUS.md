@@ -2,9 +2,13 @@
 
 Updated: 2026-11-03
 Current phase: **P4 accepted (selectively reuse); targeted follow-ups B, E, A, C in progress, not a new phase.**
-Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62). C is done (HazAT/ultimate#68; rrl-e2e note PR #65, PO-approved; experiments/P4/FOLLOWUP_C.md).
+Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62). C is done (HazAT/ultimate#68; rrl-e2e note PR #65, PO-approved; experiments/P4/FOLLOWUP_C.md). EXP-12 (#68, lean coordinator A/B) is done.
 Last verified commit: `ee888c7` (PR #65, rrl-e2e orphan note, CI green).
-Active issues: none open. P3 #33 closed 2026-11-03 (EXP-06 PARTIAL, EXP-01 via EXP-09/EXP-11, Dream measured in experiments/P3/DREAM_RUN.md). P4 issues #45–#49 closed. Follow-ups E #60 and A #62 closed.
+Active issues: none open. P3 #33 closed 2026-11-03 (EXP-06 PARTIAL, EXP-01 via EXP-09/EXP-11, Dream measured in experiments/P3/DREAM_RUN.md). P4 issues #45–#49 closed. Follow-ups E #60, A #62 and EXP-12 #68 closed.
+Result of EXP-12 #68 (`experiments/EXP-12/RUN-20261103-01.md`):
+- **Design:** built-in (O) vs lean overlay (L) coordinator, 2 single-issue tasks, same models (Opus / Sonnet 5.5 / GPT-6.1, proven from preview storage), same seed, one worker + one reviewer, hidden suites written first.
+- **Result:** H1 **FAIL**: L used +14% and +30% coordinator tokens (+6.6% and +11.6% estimated cost), with 1 and 3 more calls. H2 **PASS**: all four runs scored 11/11 and 12/12 hidden, every check exited 0, each passed one review round, 0 interventions. H3 **PARTIAL**: L's extra calls trace to "judge recorded exit codes" (it searched the worker's transcript), and its shorter branch time (−24% / −12%) to running fewer tests itself. Two differences are unexplained.
+- **Finding:** `instance.model` is read from the host project's settings, not the previewed worktree's, so previews were started by hand (PO-approved method 1a). Coordinator cost is dominated by per-wake cache writes (82–84%). n = 2.
 Result of follow-up A #62 (EXP-11, `experiments/EXP-11/RUN-20261103-01.md`):
 - **Design:** 24 gate memories written by a coverage rule (ADRs and clarifications, gates P0–P4, experiment findings), index 34 → 55; then two memory-only arms. A2's 10 unseen questions were written by an independent GPT evaluator and frozen (sha256) before the memories were drafted.
 - **Result:** A1 (EXP-09's 10) **10/10**, against 5/10. A2 (unseen) **8/10 correct + 2 partial**, 0 wrong (FAIL against the 9/10 bar). Misses: 1 content gap, 1 retrieval miss. Reads fell from 26 to 12 and 9 calls. Blind second scorer agreed 40/40. n = 1 per arm; questions and memories came from the same docs.

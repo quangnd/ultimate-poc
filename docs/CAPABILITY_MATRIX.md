@@ -45,6 +45,7 @@ before its experiment runs with the evidence standard of docs/EVALUATION.md.
 | Project context/memory | **FAIL** (memory alone) | EXP-09 blind: memory-only 5/10 (<90%), all misses true gaps, no fabrication; memory+docs 10/10 | The memory tool has no search; workers get no memory index |
 | Custom surfaces / extensions | **PASS, adopted** | PR #34 merged (c930bb6); `ultimate.extensions()` shows poc-status loaded with no errors (SCORECARD.md's "not adopted" predates this) | Issue counts come from a manual snapshot |
 | Auditability | **PASS** | FAILURES.md: 36 failed calls / 29 incidents re-counted via `ultimate.search`; relay error root-caused | Trace window limited (~7 days, 1000 rows) |
+| Preview model override per worktree | **NOT AVAILABLE** | EXP-12 (#68): `"instance": {"model": null}` in a previewed worktree's settings was ignored; the preview got `ULTIMATE_MODEL=openai-codex/gpt-6.1-sol` (`ps eww`). `extensions/instance/server.ts` `previewModelSetting(host)` reads the host project's settings | Workaround used: start `server/main.ts` by hand with the preview environment minus `ULTIMATE_MODEL` (experiments/EXP-12/tools/start-arm.sh) |
 | CI corroboration | **PASS** | GitHub Actions on PR #50 and main: green in ~50 s, agrees with the lander's checks on the same commit | n/a |
 
 Allowed status: UNVERIFIED, PASS, PARTIAL, FAIL, NOT AVAILABLE. Record version, limitation and direct proof. Distinguish framework advertised behavior from POC implementation.

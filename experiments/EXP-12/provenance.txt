@@ -1,0 +1,15 @@
+981119a68a4a9736975c229e761498f87eed367f54c6af4bb96f01324becbc27  /tmp/exp12/task1/hidden.test.ts
+ee601f6a3fb3e5cf734c572754998c62eb112595846fb032ac3209f2ea953ba8  /tmp/exp12/task1/TASK.md
+6dffab8ed08fadbc5c09c0b1b0e353fed93aea3825dc7ae9c42160ab858e2e75  /tmp/exp12/task2/hidden.test.ts
+c93b0576da6bcb3632de95b1a216f5ed80f7c0dd6f3de1a78dcdf4c13044f670  /tmp/exp12/task2/TASK.md
+bc46104698d37865075cb44f2bfe8f316baf8d3c907edeb7c6269a04875a97f5  /tmp/exp12/reference/late.ts
+2fc90ed92ce4ed10b6d122452af8e92eb6bf60391311acf8f0b9deecfe54f64d  /tmp/exp12/reference/whatif.ts
+2026-11-03T09:56:22Z
+-rw-r--r--@ 1 mun  wheel  1012 Nov  3 16:54:19 2026 /tmp/exp12/reference/late.ts
+-rw-r--r--@ 1 mun  wheel  1812 Nov  3 16:54:19 2026 /tmp/exp12/reference/whatif.ts
+-rw-r--r--@ 1 mun  wheel  4946 Nov  3 16:55:26 2026 /tmp/exp12/task1/hidden.test.ts
+-rw-r--r--@ 1 mun  wheel  2526 Nov  3 16:54:19 2026 /tmp/exp12/task1/TASK.md
+-rw-r--r--@ 1 mun  wheel  4212 Nov  3 16:56:12 2026 /tmp/exp12/task2/hidden.test.ts
+-rw-r--r--@ 1 mun  wheel  3478 Nov  3 16:54:19 2026 /tmp/exp12/task2/TASK.md
+e5b43f9f08c4dce778d7f8daf95642932fe2d05c8f9faeef6c4bdac82c575e1b  task1/SEED.txt
+20a8efe176fc63a342811d3c60912e29bee44e07e52583d87896db0c02df0c42  task2/SEED.txt

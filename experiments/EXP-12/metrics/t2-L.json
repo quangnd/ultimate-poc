@@ -1,0 +1,175 @@
+{
+ "home": "runs/t2-L",
+ "userInputsToUltimate": 1,
+ "conversations": {
+  "41": {
+   "role": "ultimate",
+   "model": "claude-code/claude-opus-5-5",
+   "calls": 5,
+   "input": 16,
+   "cacheRead": 122440,
+   "cacheWrite": 20221,
+   "output": 2638,
+   "cost": 0.2391,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.0245,
+    "cacheWrite": 0.1618,
+    "output": 0.0528
+   },
+   "first": "2026-11-03T10:15:09.558Z",
+   "last": "2026-11-03T10:18:55.436Z",
+   "tools": {
+    "branch": 1
+   },
+   "reads": {},
+   "bash": [],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 1,
+    "stop": 4
+   },
+   "total": 145315,
+   "contextMedian": 28460,
+   "contextMax": 30181,
+   "elapsedS": 226,
+   "rereads": {}
+  },
+  "92": {
+   "role": "branch",
+   "model": "claude-code/claude-opus-5-5",
+   "calls": 14,
+   "input": 32,
+   "cacheRead": 582977,
+   "cacheWrite": 132212,
+   "output": 5662,
+   "cost": 1.2877,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.1166,
+    "cacheWrite": 1.0577,
+    "output": 0.1132
+   },
+   "first": "2026-11-03T10:15:26.129Z",
+   "last": "2026-11-03T10:18:52.585Z",
+   "tools": {
+    "bash": 5,
+    "subagent": 2,
+    "codemode": 2
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/92 && git rev-parse HEAD && git status --short && ls src/domain tests/domain && cat .ultimate/skills/rrl-e2e/SKILL.md ",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/92 && grep -n \"export\" src/domain/schedule.ts src/domain/readiness.ts src/domain/calendar.ts && grep -n \"drivingChain\\",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/92 && sed -n 1,60p src/domain/schedule.ts && grep -n \"fixtures\\|import\" tests/domain/schedule.test.ts | head",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git log --oneline ab6b914..HEAD && git diff --stat ab6b914..HEAD && cat src/domain/whatif.ts",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git status --short && git format-patch -1 5cee49f -o /tmp/exp12-92-patch"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 9,
+    "stop": 5
+   },
+   "total": 720883,
+   "contextMedian": 48379,
+   "contextMax": 69938,
+   "elapsedS": 206,
+   "rereads": {}
+  },
+  "149": {
+   "role": "worker",
+   "model": "github-copilot/claude-sonnet-5.5",
+   "calls": 12,
+   "input": 26,
+   "cacheRead": 485314,
+   "cacheWrite": 43223,
+   "output": 12300,
+   "cost": 0.2796,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.0485,
+    "cacheWrite": 0.1081,
+    "output": 0.123
+   },
+   "first": "2026-11-03T10:15:53.904Z",
+   "last": "2026-11-03T10:17:44.020Z",
+   "tools": {
+    "bash": 11,
+    "write": 2
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git log --oneline -3 && git status --short | head && ls && cat src/domain/schedule.ts src/domain/readiness.ts s",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && cat docs/decisions/ADR-002-scheduling-semantics.md; grep -n -i -B2 -A12 \"US-04\\|Fixture\" docs/PRD.md | head -80",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && cat tests/domain/schedule.test.ts | head -80; cat package.json; ls tests tests/domain node_modules 2>&1 | head ",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && ls tests tests/domain src src/domain fixtures; grep -rn \"release.json\" tests src | head; sed -n 1,30p tests/dom",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && sed -n 1,40p tests/web/draft.test.ts; grep -n \"export\" src/domain/validate.ts | head; sed -n 1,40p tests/fixtur",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && node -e '\nconst s=require(\"fs\").readFileSync(\"tests/domain/whatif.test.ts\",\"utf8\");\nconst a=s.indexOf(\"  it(\\x2",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && node -e '\nconst f=\"tests/domain/whatif.test.ts\";let s=require(\"fs\").readFileSync(f,\"utf8\");\nconst o=\"a branch w",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && node -e '\nconst f=\"tests/domain/whatif.test.ts\";let s=require(\"fs\").readFileSync(f,\"utf8\");\nconst o=\"moves the ",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && diff /tmp/whatif.bak src/domain/whatif.ts && echo restored; npm run typecheck >/tmp/tc.log 2>&1; echo typecheck",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && ( eval \"$(node -e 'const n=require(\"node:net\"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,\"127.0.0",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git add src/domain/whatif.ts tests/domain/whatif.test.ts && git commit -q -F - <<'EOF'\nfeat(domain): add delayI"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 11,
+    "stop": 1
+   },
+   "total": 540863,
+   "contextMedian": 47499,
+   "contextMax": 52815,
+   "elapsedS": 110,
+   "rereads": {}
+  },
+  "270": {
+   "role": "reviewer",
+   "model": "openai-codex/gpt-6.1-sol",
+   "calls": 4,
+   "input": 24575,
+   "cacheRead": 41472,
+   "cacheWrite": 0,
+   "output": 469,
+   "cost": 0.058,
+   "costParts": {
+    "input": 0.0491,
+    "cacheRead": 0.0041,
+    "cacheWrite": 0,
+    "output": 0.0047
+   },
+   "first": "2026-11-03T10:18:05.050Z",
+   "last": "2026-11-03T10:18:18.249Z",
+   "tools": {
+    "bash": 3
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && cat README.md docs/PRD.md docs/ARCHITECTURE.md docs/ROADMAP.md state/PROJECT_STATUS.md",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git log --oneline ab6b9140941d3fb47c1ed9676887993854340d11..5cee49fcfcd144fad0e01ab3b7e89545203e4a14 && git dif",
+    "cd /private/tmp/exp12/runs/t2-L/worktrees/149 && git status --short && git rev-parse HEAD && npm run typecheck"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 3,
+    "stop": 1
+   },
+   "total": 66516,
+   "contextMedian": 10434,
+   "contextMax": 24596,
+   "elapsedS": 13,
+   "rereads": {}
+  }
+ }
+}

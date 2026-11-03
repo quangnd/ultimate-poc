@@ -1,0 +1,177 @@
+{
+ "home": "runs/t1-L",
+ "userInputsToUltimate": 1,
+ "conversations": {
+  "41": {
+   "role": "ultimate",
+   "model": "claude-code/claude-opus-5-5",
+   "calls": 5,
+   "input": 16,
+   "cacheRead": 119698,
+   "cacheWrite": 19431,
+   "output": 2022,
+   "cost": 0.2199,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.0239,
+    "cacheWrite": 0.1554,
+    "output": 0.0404
+   },
+   "first": "2026-11-03T10:07:46.524Z",
+   "last": "2026-11-03T10:11:22.138Z",
+   "tools": {
+    "branch": 1
+   },
+   "reads": {},
+   "bash": [],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 1,
+    "stop": 4
+   },
+   "total": 141167,
+   "contextMedian": 27581,
+   "contextMax": 29391,
+   "elapsedS": 216,
+   "rereads": {}
+  },
+  "92": {
+   "role": "branch",
+   "model": "claude-code/claude-opus-5-5",
+   "calls": 14,
+   "input": 32,
+   "cacheRead": 582527,
+   "cacheWrite": 125089,
+   "output": 5260,
+   "cost": 1.2225,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.1165,
+    "cacheWrite": 1.0007,
+    "output": 0.1052
+   },
+   "first": "2026-11-03T10:08:00.574Z",
+   "last": "2026-11-03T10:11:19.446Z",
+   "tools": {
+    "bash": 3,
+    "read": 2,
+    "subagent": 2,
+    "codemode": 3
+   },
+   "reads": {
+    "/private/tmp/exp12/runs/t1-L/worktrees/92/src/domain/schedule.ts": 1,
+    "/private/tmp/exp12/runs/t1-L/worktrees/92/.ultimate/skills/rrl-e2e/SKILL.md": 1
+   },
+   "bash": [
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/92 && git log -1 --format=%H && git status --short && ls src/domain tests/domain && grep -n \"export\" src/domain/schedu",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && git log --oneline ab6b914..HEAD && git diff --stat ab6b914..HEAD && cat src/domain/late.ts",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && git status --short && npm run typecheck >/tmp/tc147.log 2>&1; echo \"typecheck=$?\"; npm test >/tmp/t147.log 2>&1"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 9,
+    "stop": 5
+   },
+   "total": 712908,
+   "contextMedian": 46745,
+   "contextMax": 65849,
+   "elapsedS": 199,
+   "rereads": {}
+  },
+  "147": {
+   "role": "worker",
+   "model": "github-copilot/claude-sonnet-5.5",
+   "calls": 13,
+   "input": 28,
+   "cacheRead": 506757,
+   "cacheWrite": 53610,
+   "output": 12392,
+   "cost": 0.3087,
+   "costParts": {
+    "input": 0.0001,
+    "cacheRead": 0.0507,
+    "cacheWrite": 0.134,
+    "output": 0.1239
+   },
+   "first": "2026-11-03T10:08:22.665Z",
+   "last": "2026-11-03T10:10:12.756Z",
+   "tools": {
+    "bash": 12,
+    "write": 2
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && git log --oneline -3 && git status --short && cat AGENTS.md | head -5 && ls && cat src/domain/schedule.ts src/d",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && cat docs/decisions/ADR-002-scheduling-semantics.md fixtures/README.md; grep -n \"US-04\\|US-06\" -A8 docs/PRD.md |",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && ls tests tests/domain; cat tests/domain/readiness.test.ts | head -80; grep -n \"targetDate\" fixtures/release.jso",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && ls node_modules | head -3; cat tests/fixture.test.ts | head -50; cat src/domain/calendar.ts; ls src/domain; gre",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && node -e '\nconst d=JSON.parse(require(\"fs\").readFileSync(\"fixtures/release.json\"));\nfor(const t of d.tasks) cons",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && cat > /tmp/probe147.ts <<'EOF'\nimport { readFileSync } from 'node:fs'\nimport { schedule } from '/private/tmp/ex",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && grep -n \"shuffl\\|reverse\\|freeze\\|structuredClone\" tests/domain/*.test.ts tests/*.test.ts | head -20; sed -n 1,",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && sed -i '' \"s/it(\\\"takes finishDate and slipDays from the scheduler and stream and targetDate from the task\\\"/it",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && cp src/domain/late.ts /tmp/late.orig.ts\nrun() { npx vitest run tests/domain/late.test.ts 2>&1 | grep -E \"Tests ",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && diff /tmp/late.orig.ts src/domain/late.ts && echo restored; npm run typecheck 2>&1 | tail -5; echo \"typecheck e",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && ( eval \"$(node -e 'const n=require(\"node:net\"),f=()=>new Promise(r=>{const s=n.createServer().listen(0,\"127.0.0",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && git add src/domain/late.ts tests/domain/late.test.ts && git commit -q -F - <<'EOF'\nfeat(domain): lateTasks list"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 12,
+    "stop": 1
+   },
+   "total": 572787,
+   "contextMedian": 44125,
+   "contextMax": 53612,
+   "elapsedS": 110,
+   "rereads": {}
+  },
+  "272": {
+   "role": "reviewer",
+   "model": "openai-codex/gpt-6.1-sol",
+   "calls": 3,
+   "input": 21644,
+   "cacheRead": 17280,
+   "cacheWrite": 0,
+   "output": 550,
+   "cost": 0.0505,
+   "costParts": {
+    "input": 0.0433,
+    "cacheRead": 0.0017,
+    "cacheWrite": 0,
+    "output": 0.0055
+   },
+   "first": "2026-11-03T10:10:31.506Z",
+   "last": "2026-11-03T10:10:39.359Z",
+   "tools": {
+    "bash": 2
+   },
+   "reads": {},
+   "bash": [
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && cat README.md docs/PRD.md docs/ARCHITECTURE.md docs/ROADMAP.md state/PROJECT_STATUS.md >/tmp/review272-context ",
+    "cd /private/tmp/exp12/runs/t1-L/worktrees/147 && cat /tmp/review272-context && cat docs/decisions/ADR-002-scheduling-semantics.md src/domain/schedule.ts src/dom"
+   ],
+   "sleeps": 0,
+   "codemodeLoops": 0,
+   "messages": [],
+   "errors": [],
+   "stopReasons": {
+    "toolUse": 2,
+    "stop": 1
+   },
+   "total": 39474,
+   "contextMedian": 10771,
+   "contextMax": 21760,
+   "elapsedS": 8,
+   "rereads": {}
+  }
+ }
+}
