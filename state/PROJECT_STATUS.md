@@ -4,7 +4,7 @@ Updated: 2026-11-03
 Current phase: **P4 accepted (selectively reuse); targeted follow-ups B, E, A, C in progress, not a new phase.**
 Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62). C is done (HazAT/ultimate#68; rrl-e2e note PR #65, PO-approved; experiments/P4/FOLLOWUP_C.md).
 Last verified commit: `ee888c7` (PR #65, rrl-e2e orphan note, CI green).
-Active issues: P3 #33 (EXP-06/EXP-01/Dream), still open. P4 issues #45–#49 closed. Follow-ups E #60 and A #62 closed.
+Active issues: none open. P3 #33 closed 2026-11-03 (EXP-06 PARTIAL, EXP-01 via EXP-09/EXP-11, Dream measured in experiments/P3/DREAM_RUN.md). P4 issues #45–#49 closed. Follow-ups E #60 and A #62 closed.
 Result of follow-up A #62 (EXP-11, `experiments/EXP-11/RUN-20261103-01.md`):
 - **Design:** 24 gate memories written by a coverage rule (ADRs and clarifications, gates P0–P4, experiment findings), index 34 → 55; then two memory-only arms. A2's 10 unseen questions were written by an independent GPT evaluator and frozen (sha256) before the memories were drafted.
 - **Result:** A1 (EXP-09's 10) **10/10**, against 5/10. A2 (unseen) **8/10 correct + 2 partial**, 0 wrong (FAIL against the 9/10 bar). Misses: 1 content gap, 1 retrieval miss. Reads fell from 26 to 12 and 9 calls. Blind second scorer agreed 40/40. n = 1 per arm; questions and memories came from the same docs.
