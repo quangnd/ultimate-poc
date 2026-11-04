@@ -3,7 +3,7 @@
 Updated: 2026-11-04
 Current phase: **POC COMPLETE.** Final report: `docs/FINAL_REPORT.md` (verdict: selectively reuse, 3.35/5).
 Current focus: none; awaiting the PO's review of the final report. All follow-ups are done: B PASS (0/448 relay errors in 24 h vs 25/1036; NETWORK_FIX.md §7), E (#60), A (#62), C (HazAT/ultimate#68; PR #65), EXP-12 (#68).
-Last verified commit: `6e0a0e3` on main (PR #70, CI green); fresh-clone suite 775 passed (reviewer #20456 at 65d5b8a).
+Last verified commit: `6e0a0e3` on main (PR #70, CI green); suite 775 passed at 65d5b8a (reviewer #20456).
 Active issues: none open. P3 #33 closed 2026-11-03 (EXP-06 PARTIAL, EXP-01 via EXP-09/EXP-11, Dream measured in experiments/P3/DREAM_RUN.md). P4 issues #45–#49 closed. Follow-ups E #60, A #62 and EXP-12 #68 closed.
 Result of EXP-12 #68 (`experiments/EXP-12/RUN-20261103-01.md`):
 - **Design:** built-in (O) vs lean overlay (L) coordinator, 2 single-issue tasks, same models (Opus / Sonnet 5.5 / GPT-6.1, proven from preview storage), same seed, one worker + one reviewer, hidden suites written first.
