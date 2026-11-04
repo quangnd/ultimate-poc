@@ -12,7 +12,7 @@
 - Required formats from agent instructions (assessments, `Decisions:` blocks, question cards) take precedence over these rules.
 
 ## Workflow
-- Small, well-defined coding changes: no extra orchestration, but one read-only reviewer from a different model family before merge (a deliberate addition to Ultimate's small-change flow). Blind QA only for stateful, concurrency or data-integrity work.
+- Blind QA (from the base SHA, briefed from acceptance criteria only, with mutation checks) only for stateful, concurrency or data-integrity work; never for small changes.
 - Report tokens and estimated cost separately; state the cutoff, scope and n with any metric.
 - Run `git push`, `gh pr create` and `gh pr merge` as separate bounded steps; check the state before any retry.
 - This machine has no `rg` and no GNU `timeout`: use `grep -rn`, `find` and the bash tool's timeout.

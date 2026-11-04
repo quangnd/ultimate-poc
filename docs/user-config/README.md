@@ -31,7 +31,7 @@ Dropped:
 
 Reworded to avoid conflicts:
 - **Missing inputs.** The Pi rule says the first line must be the artifact. It is limited to texts and drafts, because Ultimate's prompt tells agents to investigate and wait for a go before changing code when a request is a question.
-- **Small tasks.** Ultimate routes a small, clear change to a coordinator that does it itself, without workers or review. The user rule keeps that (no extra orchestration) and deliberately adds one cross-family reviewer before merge (PO decision, P4 gate; OPERATING_PROFILE §1). This is a stated addition, not a silent conflict. In this project it also matches AGENTS.md "Workflow" step 5, a second deliberate overlap.
+- **Small tasks.** The planned line "one coding agent plus a cross-family reviewer for small tasks" was dropped: Ultimate routes a small, clear change to a coordinator that does it itself "with no epic, workers or review" (`agents/ultimate.md`), so a user-level mandate would conflict. Where a project wants that review (this one: AGENTS.md "Workflow" step 5, coordinator overlay "Default flow"), the project's own instructions say so. Only the blind QA scope rule remains.
 - **Formats.** Ultimate's coordinator and @ultimate instructions require fixed formats (assessments, a `Decisions:` block, question cards). A last style line says those formats take precedence, so the "no per-option breakdown" rule cannot fight them.
 
 ## Backup, copy, rollback
