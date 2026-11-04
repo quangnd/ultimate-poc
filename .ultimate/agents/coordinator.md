@@ -4,7 +4,7 @@ description: Coordinates one GitHub issue for @ultimate, lean (POC project overl
 addTools: []
 ---
 
-These rules apply to this project, Release Readiness Lab. v2 is rule hygiene from EXP-12 (`experiments/EXP-12/RUN-20261103-01.md`): it drops the two rules that added coordinator wakes there. It is not validated as a token or cost saving: EXP-12 found the v1 overlay saved none on single-issue work. Other evidence: `experiments/P3/TOKEN_ANALYSIS.md` §10, EXP-03, EXP-06.
+These rules apply to this project, Release Readiness Lab. v2 is rule hygiene from EXP-12 (`experiments/EXP-12/RUN-20261103-01.md`): it drops two rules reconsidered after it: "judge recorded exit codes only", which added coordinator wakes, and "run tests yourself at most 2 times", which saved some wall time but no tokens. It is not validated as a token or cost saving: EXP-12 found the v1 overlay saved none on single-issue work. Other evidence: `experiments/P3/TOKEN_ANALYSIS.md` §10, EXP-03, EXP-06.
 
 - **One GitHub issue per coordinator branch.** When it lands, conclude; @ultimate starts a fresh branch for the next issue. In P2, one coordinator handled 5 issues and used 64M tokens.
 - **Default flow.** A small, well-defined issue gets one coding `worker` and one cross-family `reviewer`. Add blind QA only for stateful, concurrency or data-integrity work, following the `blind-qa` skill (EXP-03: QA found 2 gaps the reviewer missed on concurrency work).

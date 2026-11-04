@@ -29,4 +29,4 @@ Only @ultimate writes memories, with one `remember` batch. Hand it the ops (add 
 
 ## Validation status: PARTIAL
 
-In one run (n = 1), memories written by this rule answered 10/10 questions on previously known gaps and 8/10 unseen questions (+2 partial, 0 wrong). The question writer and the memory writer read the same documents, so this shows coverage of doc-sourced questions only; questions about conversations, intent or code are untested.
+In one run (EXP-11, n = 1), memories written by this rule answered 10/10 questions on previously known gaps and 8/10 unseen questions (+2 partial, 0 wrong). The question writer and the memory writer read the same documents, so this shows coverage of doc-sourced questions only; questions about conversations, intent or code are untested.
