@@ -1,9 +1,9 @@
 # Project Checkpoint
 
-Updated: 2026-11-03
-Current phase: **P4 accepted (selectively reuse); targeted follow-ups B, E, A, C in progress, not a new phase.**
-Current focus: the P4 follow-ups. B (network fix) is PARTIAL until its 24 h re-count (≥ 2026-11-03 23:43Z). E is done (#60). A is done (#62). C is done (HazAT/ultimate#68; rrl-e2e note PR #65, PO-approved; experiments/P4/FOLLOWUP_C.md). EXP-12 (#68, lean coordinator A/B) is done.
-Last verified commit: `4973aba` (PR #69, EXP-12 record, CI green).
+Updated: 2026-11-04
+Current phase: **POC COMPLETE.** Final report: `docs/FINAL_REPORT.md` (verdict: selectively reuse, 3.35/5).
+Current focus: none; awaiting the PO's review of the final report. All follow-ups are done: B PASS (0/448 relay errors in 24 h vs 25/1036; NETWORK_FIX.md §7), E (#60), A (#62), C (HazAT/ultimate#68; PR #65), EXP-12 (#68).
+Last verified commit: `6e0a0e3` on main (PR #70, CI green); suite 775 passed at 65d5b8a (reviewer #20456).
 Active issues: none open. P3 #33 closed 2026-11-03 (EXP-06 PARTIAL, EXP-01 via EXP-09/EXP-11, Dream measured in experiments/P3/DREAM_RUN.md). P4 issues #45–#49 closed. Follow-ups E #60, A #62 and EXP-12 #68 closed.
 Result of EXP-12 #68 (`experiments/EXP-12/RUN-20261103-01.md`):
 - **Design:** built-in (O) vs lean overlay (L) coordinator, 2 single-issue tasks, same models (Opus / Sonnet 5.5 / GPT-6.1, proven from preview storage), same seed, one worker + one reviewer, hidden suites written first.
@@ -28,7 +28,7 @@ Result of P4 #49:
   - Provider failures: 36 calls in 29 incidents, all recovered, with no duplicate effects. 14 needed a deliberate resume (9 by @ultimate, 5 by the human for 429s), and the 429 waits totalled 15.2 h.
 P4 earlier: #47/#48 (EXP-07/08, PR #55): every arm passed 34/34. Plain Pi was ~2.2× faster and 1.7× cheaper (model-confounded), and the same-model single worker cost 3.6× less than orchestration. #46 (EXP-09, PR #52): memory-only recall 5/10, memory plus docs 10/10. #45 CI enabled (PR #50).
 Blockers: none.
-Next action: B's 24 h re-count after 2026-11-03 23:43Z (automation A3), then the closing evaluation report (retain / change / unproven).
+Next action: none. Any further work needs a new PO decision (see FINAL_REPORT.md "Unproven").
 Decisions taken: P0 (PR per issue, coordinator merges; model families kept; A/B on anthropic opus-5-5). P0 gate: ADR-001/002 accepted, GitHub merge only, lander checks only and no push. P1 gate: ADR-002 clarifications 1–5 and the driving-chain limit accepted. Project `.ultimate/` setup trusted (2026-11-01). P3 gate: "Start P4 as proposed, with CI on".
 P4 gate (PO, 2026-11-03): verdict accepted, selectively reuse. Follow-ups in order B, E, A, C, as targeted tasks: B = the network fix, applied as a host CLI flag (PR #59); E = EXP-10 (#60, done); A = the memory-gap fix and re-run; C = report the orphaned-Vite defect upstream. Not approved: 429 auto-Play. Default delivery flow: one worker, an independent cross-family reviewer, and lander/CI checks.
 
