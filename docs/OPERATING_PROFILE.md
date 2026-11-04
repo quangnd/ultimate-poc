@@ -44,7 +44,8 @@ Do not run full coordinator → builder → QA → reviewer orchestration on sma
 | Rule | Status | Evidence |
 |---|---|---|
 | Always an independent reviewer from a different model family than the builder, read-only | OBSERVED (consistent across P1–P4) | It caught every real code defect in P1, P2 and EXP-08/10 that builders and QA missed (P1 D1, D2; EXP-08 task 3; EXP-10 completion-date defect). Cost $0.03–0.16 per round in P2 |
-| Findings go to the builder; a second round if anything changed | OBSERVED | EXP-03, EXP-10: fixed in one round |
+| Findings go to the builder, who fixes them | OBSERVED | EXP-10: each arm's finding fixed in one fix pass. EXP-03: 2 review rounds |
+| Re-review after a fix that changes code | UNVERIFIED (proposed practice, not a PO decision, not observed) | EXP-10: no second review followed the fix in either arm (RUN-20261103-01 "Review rounds") |
 
 ### QA
 | Rule | Status | Evidence |
