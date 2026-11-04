@@ -1,6 +1,6 @@
 ---
 name: issue-closeout
-description: Close a GitHub issue of this POC with an evidence package (measurement cutoff and scope, metrics from tools/metrics, verification) and leave state/PROJECT_STATUS.md consistent. Use when an issue's PR has merged and the issue, its experiment record or the checkpoint must be closed out.
+description: Release Readiness Lab only (this repo's state/PROJECT_STATUS.md and tools/metrics). Close a GitHub issue of this POC with an evidence package (measurement cutoff and scope, metrics from tools/metrics, verification) and leave state/PROJECT_STATUS.md consistent. Use when an issue's PR has merged and the issue, its experiment record or the checkpoint must be closed out.
 ---
 
 # Issue closeout
