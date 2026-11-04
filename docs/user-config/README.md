@@ -21,15 +21,17 @@ Nothing else under `~/.ultimate/` changes: `settings.json`, `model-families.json
 
 ## Selection from `~/.pi/agent/AGENTS.md`
 
-Kept (condensed): direct answer first; plain language; recommendation first; one framing; length discipline; usable draft when inputs are missing; one strong example; depth only when warranted; no em/en dashes or spaced hyphens; no preambles or slop intros; "->" for arrows.
+Kept (condensed): direct answer first; plain language; no per-option matrix; one framing; the necessary-detail rule; usable draft when inputs are missing; one strong example; depth only when warranted; no em/en dashes or spaced hyphens; no preambles or slop intros; "->" for arrows.
 
 Dropped:
 - **"About me"** (job title, employer, industry): not needed for tone; the style rules carry it.
 - **"Be direct and opinionated, call out trade-offs"**: Ultimate's system prompt already says "Be concise and direct. Surface the risks and tradeoffs that matter, and recommend one option" (duplicate).
 - **"Avoid AI-style phrasing"**: vague; covered by the concrete no-preamble and no-slop-intro rules.
+- **"Lead with the recommendation"** and **"be as short as the answer allows"**: duplicates of the same system-prompt line ("recommend one option", "Be concise and direct"). Only the parts it lacks stay: no per-option matrix, and never so short that a follow-up is needed.
 
 Reworded to avoid conflicts:
 - **Missing inputs.** The Pi rule says the first line must be the artifact. It is limited to texts and drafts, because Ultimate's prompt tells agents to investigate and wait for a go before changing code when a request is a question.
+- **Small tasks.** Ultimate routes a small, clear change to a coordinator that does it itself, without workers or review. The user rule keeps that (no extra orchestration) and deliberately adds one cross-family reviewer before merge (PO decision, P4 gate; OPERATING_PROFILE §1). This is a stated addition, not a silent conflict. In this project it also matches AGENTS.md "Workflow" step 5, a second deliberate overlap.
 - **Formats.** Ultimate's coordinator and @ultimate instructions require fixed formats (assessments, a `Decisions:` block, question cards). A last style line says those formats take precedence, so the "no per-option breakdown" rule cannot fight them.
 
 ## Backup, copy, rollback
@@ -52,10 +54,13 @@ cp -R docs/user-config/skills/blind-qa docs/user-config/skills/evidence-closeout
 Rollback (no restart needed; instructions and skills reload on the next turn):
 
 ```bash
-rm ~/.ultimate/AGENTS.md; rm -r ~/.ultimate/skills
-# if any pre-existing file changed, also restore it from the backup (the tarball holds no AGENTS.md or skills/):
-tar xzf ~/ultimate-user-backup-20261104.tgz -C ~
+# neither ~/.ultimate/AGENTS.md nor ~/.ultimate/skills/ existed before M3 (check: tar tzf on the backup lists neither)
+rm ~/.ultimate/AGENTS.md
+rm -r ~/.ultimate/skills/blind-qa ~/.ultimate/skills/evidence-closeout ~/.ultimate/skills/gate-memories
+rmdir ~/.ultimate/skills   # fails, harmlessly, if other skills were added since
 ```
+
+To recover a single pre-existing file (for example the deleted stray `exp09-closeout.md`), extract only that member: `tar xzf ~/ultimate-user-backup-20261104.tgz -C ~ .ultimate/exp09-closeout.md`. Never extract the whole tarball over live state.
 
 ## Validation
 
